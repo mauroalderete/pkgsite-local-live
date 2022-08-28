@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 NAME=watcher
 VERSION_TAG=v1.0.0
@@ -29,7 +29,7 @@ printcolor() {
 }
 
 printverbose() {
-    if [[ $VERBOSE == true ]]; then
+    if [ $VERBOSE = true ]; then
         printcolor $whitei "$(printf "[$NAME] $1")\n";
     fi
 }
@@ -67,12 +67,12 @@ show_usage() {
 }
 
 show_version() {
-    printinfo "$NAME $VERSION_TAG"
+    printinfo "$NAME $VERSION_TAG\n"
 }
 
 exit_script() {
     printverbose "Exit with $1"
-    if [[ $1 != 0 ]]; then
+    if [ $1 != 0 ]; then
         printerror "Exit with $1\n";
     fi
     exit $1
@@ -109,19 +109,19 @@ done
 
 printverbose "Parse arguments..."
 
-if [[ $HELP == true ]]; then
+if [ $HELP = true ]; then
     show_usage;
 
     exit;
 fi
 
-if [[ $VERSION == true ]]; then
+if [ $VERSION = true ]; then
     show_version
 
     exit;
 fi
 
-if [[ $COMMAND == "" || $INOTIFY == "" ]]; then
+if [ "$COMMAND" = "" ] || [ "$INOTIFY" = "" ]; then
     printerror "Argument missing\n"
     show_usage;
 
@@ -149,8 +149,8 @@ do
     COMMAND_CODE=$?
     printcommand "$COMMAND_STDOUT\n"
 
-    if [[ $COMMAND_CODE != 0 ]]; then
-        if [[ $KEEPLIVE == false ]]; then
+    if [ $COMMAND_CODE != 0 ]; then
+        if [ $KEEPLIVE = false ]; then
             printerror "Failed to execute the command, exited with code $COMMAND_CODE\n"
             printerror "Stopping...\n"
 
