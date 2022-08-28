@@ -1,0 +1,16 @@
+init_tasks:
+  - command: "stopservice"
+  - command: "startservice"
+    nowait: true
+
+watchers:
+  - extension: go
+    tasks:
+    - command: "stopservice"
+    - command: "startservice"
+      nowait: true
+  - extension: md
+    tasks:
+    - command: "stopservice"
+    - command: "startservice"
+      nowait: true
