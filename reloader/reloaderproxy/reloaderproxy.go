@@ -5,13 +5,15 @@ import (
 	"net/http"
 	"net/http/httputil"
 	neturl "net/url"
+
+	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
 )
 
 type reloaderProxy struct {
 	origin       *neturl.URL
 	endpoint     *neturl.URL
 	proxy        *httputil.ReverseProxy
-	interceptors map[string]func(*http.Response) error
+	interceptors map[string]interceptor.Interceptor
 }
 
 func (rp *reloaderProxy) director(req *http.Request) {
@@ -24,7 +26,21 @@ func (rp *reloaderProxy) director(req *http.Request) {
 func (rp *reloaderProxy) modify(r *http.Response) error {
 
 	for name, interceptor := range rp.interceptors {
-		err := interceptor(r)
+
+		accepted := true
+		for _, rule := range interceptor.Rules() {
+			if !rule(r) {
+				accepted = false
+				break
+			}
+		}
+
+		if !accepted {
+			break
+		}
+
+		handler := interceptor.Handler()
+		err := handler(r)
 		if err != nil {
 			return fmt.Errorf("interceptor '%s' failed to run: %v", name, err)
 		}
@@ -44,7 +60,7 @@ func (rp *reloaderProxy) Run() error {
 type ConfigurerNew interface {
 	SetOrigin(url string) error
 	SetEndpoint(url string) error
-	AddInterceptor(name string, interceptor func(*http.Response) error) error
+	AddInterceptor(name string, interceptor interceptor.Interceptor) error
 }
 
 type configurerPoolNew struct {
@@ -81,7 +97,7 @@ func (c *configurerPoolNew) SetEndpoint(url string) error {
 	return nil
 }
 
-func (c *configurerPoolNew) AddInterceptor(name string, interceptor func(*http.Response) error) error {
+func (c *configurerPoolNew) AddInterceptor(name string, interceptor interceptor.Interceptor) error {
 
 	c.pool = append(c.pool, func(rp *reloaderProxy) error {
 
@@ -108,7 +124,7 @@ func New(options ...func(ConfigurerNew) error) (*reloaderProxy, error) {
 	}
 
 	proxy := &reloaderProxy{
-		interceptors: make(map[string]func(*http.Response) error),
+		interceptors: make(map[string]interceptor.Interceptor),
 	}
 
 	proxy.proxy = &httputil.ReverseProxy{
