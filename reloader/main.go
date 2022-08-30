@@ -14,9 +14,15 @@ func main() {
 		cn.SetOrigin("http://localhost:3000")
 		cn.SetEndpoint("http://localhost:9090")
 
-		lr, err := livereload.New()
+		lr, err := livereload.New(func(cn livereload.ConfigurerNew) error {
+			err := cn.WebserviceInjectable("./interceptor/livereload/websocket.html")
+			if err != nil {
+				return fmt.Errorf("failed to configure a webservice injectable resource: %v", err)
+			}
+			return nil
+		})
 		if err != nil {
-			return fmt.Errorf("failed to load livereload interceptor")
+			return fmt.Errorf("failed to load livereload interceptor: %v", err)
 		}
 		cn.AddInterceptor("livereload", lr)
 

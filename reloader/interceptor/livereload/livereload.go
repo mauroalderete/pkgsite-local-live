@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 
 	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
 )
 
-var javascriptToInject string
-
 type Livereload struct {
-	rules   []interceptor.InterceptorRuler
-	handler interceptor.InterceptorHandler
+	webserviceInjectable string
+	rules                []interceptor.InterceptorRuler
 }
 
 func (l *Livereload) Rules() []interceptor.InterceptorRuler {
@@ -21,7 +21,23 @@ func (l *Livereload) Rules() []interceptor.InterceptorRuler {
 }
 
 func (l *Livereload) Handler() interceptor.InterceptorHandler {
-	return l.handler
+	return func(r *http.Response) error {
+		content, err := getBody(r)
+		if err != nil {
+			return fmt.Errorf("failed to get body: %v", err)
+		}
+
+		exp := regexp.MustCompile("</body>")
+		location := exp.FindIndex([]byte(content))
+
+		contentModified := content[:location[0]-1]
+		contentModified += fmt.Sprintf("\n%s\n", l.webserviceInjectable)
+		contentModified += content[location[0]:]
+
+		r.Body = io.NopCloser(strings.NewReader(contentModified))
+
+		return nil
+	}
 }
 
 func statusCodeRule(r *http.Response) bool {
@@ -40,6 +56,22 @@ func contentTypeRule(r *http.Response) bool {
 	return isTextHML
 }
 
+func hasOneBodyTagRule(r *http.Response) bool {
+	content, err := getBody(r)
+	if err != nil {
+		return false
+	}
+
+	openTagExp := regexp.MustCompile("<body>")
+	closeTagExp := regexp.MustCompile("</body>")
+	openTagMatchs := openTagExp.FindAll([]byte(content), -1)
+	closeTagMatchs := closeTagExp.FindAll([]byte(content), -1)
+
+	r.Body = io.NopCloser(strings.NewReader(content))
+
+	return len(openTagMatchs) == 1 && len(closeTagMatchs) == 1
+}
+
 func getBody(r *http.Response) (string, error) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -53,22 +85,64 @@ func getBody(r *http.Response) (string, error) {
 	return string(body), nil
 }
 
-func handler(r *http.Response) error {
-	body, err := getBody(r)
-	if err != nil {
-		return fmt.Errorf("failed to get body: %v", err)
+type ConfigurerNew interface {
+	WebserviceInjectable(path string) error
+}
+
+type configurerNew struct {
+	pool []func(l *Livereload) error
+}
+
+func (c *configurerNew) WebserviceInjectable(path string) error {
+	if len(path) == 0 {
+		return fmt.Errorf("path cannot be empty")
 	}
 
-	r.Body = io.NopCloser(strings.NewReader("Hola World" + body))
+	c.pool = append(c.pool, func(l *Livereload) error {
+		file, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed load webservice injectable resource from %s: %v", path, err)
+		}
+		content, err := io.ReadAll(file)
+		if err != nil {
+			return fmt.Errorf("failed to access at the content of webservice injectable resource: %v", err)
+		}
+
+		l.webserviceInjectable = string(content)
+		return nil
+	})
 
 	return nil
 }
 
-func New() (interceptor.Interceptor, error) {
+func New(options ...func(ConfigurerNew) error) (interceptor.Interceptor, error) {
 
 	livereload := &Livereload{
-		rules:   []interceptor.InterceptorRuler{statusCodeRule, contentTypeRule},
-		handler: handler,
+		rules: []interceptor.InterceptorRuler{
+			statusCodeRule,
+			contentTypeRule,
+			hasOneBodyTagRule,
+		},
+	}
+
+	configurer := &configurerNew{}
+
+	for _, option := range options {
+		err := option(configurer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load the configuration: %v", err)
+		}
+	}
+
+	for _, config := range configurer.pool {
+		err := config(livereload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply the configuration: %v", err)
+		}
+	}
+
+	if len(livereload.webserviceInjectable) == 0 {
+		return nil, fmt.Errorf("a webserviceInjectable is required")
 	}
 
 	return livereload, nil
