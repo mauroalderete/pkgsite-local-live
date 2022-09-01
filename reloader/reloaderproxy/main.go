@@ -4,27 +4,13 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor/livereload"
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderproxy"
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderwebsocket"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderproxy/interceptor/livereload"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderproxy/proxy"
 )
 
 func main() {
 
-	websocket, err := reloaderwebsocket.New(func(cn reloaderwebsocket.ConfigurerNew) error {
-		err := cn.Endpoint("localhost:9091")
-		if err != nil {
-			return fmt.Errorf("failed to configure endpoint of the new reloader websocket: %v", err)
-		}
-		return nil
-	})
-	if err != nil {
-		log.Fatalf("failed to create a new teload websocket %v", err)
-	}
-
-	go websocket.Run()
-
-	proxy, err := reloaderproxy.New(func(cn reloaderproxy.ConfigurerNew) error {
+	proxy, err := proxy.New(func(cn proxy.ConfigurerNew) error {
 		cn.SetOrigin("http://localhost:3000")
 		cn.SetEndpoint("http://localhost:9090")
 
