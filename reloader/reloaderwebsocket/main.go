@@ -19,5 +19,5 @@ func main() {
 		log.Fatalf("failed to create a new teload websocket %v", err)
 	}
 
-	go websocket.Run()
+	websocket.Run()
 }

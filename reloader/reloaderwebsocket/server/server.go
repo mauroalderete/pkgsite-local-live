@@ -2,97 +2,76 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	neturl "net/url"
-	"strings"
 
-	"github.com/gorilla/websocket"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderwebsocket/connections"
 )
 
-var connectionCount = 0
-
 type server struct {
-	endpoint     *neturl.URL
-	server       *http.ServeMux
-	reloadSignal chan bool
-	stopSignal   chan bool
+	endpoint    *neturl.URL
+	server      *http.ServeMux
+	connections map[string]*connections.Connection
+}
+
+func (rw *server) responseError(w io.Writer, message error) {
+	log.Println(message.Error())
+
+	_, err := io.WriteString(w, message.Error())
+	if err != nil {
+		log.Printf("failed to send a response to requester: %v", err)
+	}
 }
 
 func (rw *server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[reloadwebsocket] start\n")
 
-	connectionCount++
-	var connectionID = connectionCount
-	log.Printf("[reloadwebsocket] connections count: %d\n", connectionCount)
-
-	upgrader := websocket.Upgrader{}
-
-	upgrader.CheckOrigin = func(r *http.Request) bool {
-		origin := r.Header.Values("Origin")
-		if len(origin) != 1 {
-			return false
+	connection, err := connections.New(func(c connections.Configurer) error {
+		err := c.Request(r)
+		if err != nil {
+			return fmt.Errorf("failed to config request: %v", err)
 		}
-		return strings.HasPrefix(origin[0], "http://localhost")
-	}
 
-	log.Printf("[reloadwebsocket %d] creating ws\n", connectionID)
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("[reloadwebsocket %d] failed upgrade connection: %v\n", connectionID, err)
-		return
-	}
-	defer log.Printf("reloadwebsocket %d] defering...", connectionID)
-	defer c.Close()
+		err = c.ResponseWriter(w)
+		if err != nil {
+			return fmt.Errorf("failed to config response: %v", err)
+		}
 
-	stopReloadHandler := make(chan bool)
-
-	c.SetCloseHandler(func(code int, text string) error {
-		log.Printf("[reloadwebsocket %d] clossing... %d %s", connectionID, code, text)
 		return nil
 	})
+	if err != nil {
+		rw.responseError(w, fmt.Errorf("failed to create a connection: %v", err))
+		return
+	}
 
-	go func() {
-		for {
-			mt, message, err := c.ReadMessage()
-			if err != nil {
-				log.Printf("[reloadwebsocket %d] failed read %v\n", connectionID, err)
-				//<-
-				return
-			}
-			log.Printf("[reloadwebsocket %d] recibe %v %v\n", connectionID, mt, message)
-		}
-	}()
+	err = connection.Open()
+	if err != nil {
+		rw.responseError(w, fmt.Errorf("failed to create a connection: %v", err))
+		return
+	}
 
-	go func() {
-		log.Printf("[reloadwebsocket %d] start processing...\n", connectionID)
+	rw.connections[connection.UUID()] = connection
 
-		for {
-			select {
-			case <-rw.reloadSignal:
-				{
-					log.Printf("[reloadwebsocket %d] reload signal", connectionID)
-					err := c.WriteMessage(1, []byte("reload"))
-					if err != nil {
-						log.Printf("[reloadwebsocket %d] failed to send message: %v", connectionID, err)
-						break
-					}
-				}
-			case <-rw.stopSignal:
-				{
-					log.Printf("[reloadwebsocket %d] stop signal", connectionID)
-					stopReloadHandler <- true
-				}
-			}
-		}
-	}()
+	err = connection.Start()
+	if err != nil {
+		rw.responseError(w, fmt.Errorf("failed to start a connection: %v", err))
+		return
+	}
 
-	<-stopReloadHandler
+	delete(rw.connections, connection.UUID())
+
+	defer connection.Close()
 }
 
 func (rw *server) reloadHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Printf("Emit broadcasting signal to reload\n")
-	rw.reloadSignal <- true
+	log.Printf("Emit broadcasting signal to reload\n")
+
+	for _, conn := range rw.connections {
+		log.Printf("send reload signal to %s connection\n", conn.UUID())
+		conn.Reload()
+	}
 }
 
 func (rw *server) Run() {
@@ -104,7 +83,6 @@ func (rw *server) Run() {
 }
 
 func (rw *server) Stop() {
-	rw.stopSignal <- true
 }
 
 type ConfigurerNew interface {
@@ -155,9 +133,7 @@ func New(options ...func(ConfigurerNew) error) (*server, error) {
 
 	websocket.server = http.NewServeMux()
 
-	websocket.reloadSignal = make(chan bool)
-	websocket.stopSignal = make(chan bool)
-
+	websocket.connections = make(map[string]*connections.Connection)
 	websocket.server.HandleFunc("/", websocket.websocketHandler)
 	websocket.server.HandleFunc("/reload", websocket.reloadHandler)
 
