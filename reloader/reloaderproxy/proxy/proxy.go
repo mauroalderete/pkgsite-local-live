@@ -1,4 +1,4 @@
-package reloaderproxy
+package proxy
 
 import (
 	"fmt"
@@ -6,24 +6,24 @@ import (
 	"net/http/httputil"
 	neturl "net/url"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderproxy/interceptor"
 )
 
-type reloaderProxy struct {
+type proxy struct {
 	origin       *neturl.URL
 	endpoint     *neturl.URL
 	proxy        *httputil.ReverseProxy
 	interceptors map[string]interceptor.Interceptor
 }
 
-func (rp *reloaderProxy) director(req *http.Request) {
+func (rp *proxy) director(req *http.Request) {
 	req.Host = rp.origin.Host
 	req.URL.Host = rp.origin.Host
 	req.URL.Scheme = rp.origin.Scheme
 	req.RequestURI = ""
 }
 
-func (rp *reloaderProxy) modify(r *http.Response) error {
+func (rp *proxy) modify(r *http.Response) error {
 
 	for name, interceptor := range rp.interceptors {
 
@@ -49,7 +49,7 @@ func (rp *reloaderProxy) modify(r *http.Response) error {
 	return nil
 }
 
-func (rp *reloaderProxy) Run() error {
+func (rp *proxy) Run() error {
 	err := http.ListenAndServe(rp.endpoint.Host, rp.proxy)
 	if err != nil {
 		return fmt.Errorf("reloader proxy failed: %v", err)
@@ -64,7 +64,7 @@ type ConfigurerNew interface {
 }
 
 type configurerPoolNew struct {
-	pool []func(*reloaderProxy) error
+	pool []func(*proxy) error
 }
 
 func (c *configurerPoolNew) SetOrigin(url string) error {
@@ -74,7 +74,7 @@ func (c *configurerPoolNew) SetOrigin(url string) error {
 		return fmt.Errorf("failed to parse origin url: %v", err)
 	}
 
-	c.pool = append(c.pool, func(rp *reloaderProxy) error {
+	c.pool = append(c.pool, func(rp *proxy) error {
 		rp.origin = o
 		return nil
 	})
@@ -89,7 +89,7 @@ func (c *configurerPoolNew) SetEndpoint(url string) error {
 		return fmt.Errorf("failed to parse endpoint url: %v", err)
 	}
 
-	c.pool = append(c.pool, func(rp *reloaderProxy) error {
+	c.pool = append(c.pool, func(rp *proxy) error {
 		rp.endpoint = o
 		return nil
 	})
@@ -99,7 +99,7 @@ func (c *configurerPoolNew) SetEndpoint(url string) error {
 
 func (c *configurerPoolNew) AddInterceptor(name string, interceptor interceptor.Interceptor) error {
 
-	c.pool = append(c.pool, func(rp *reloaderProxy) error {
+	c.pool = append(c.pool, func(rp *proxy) error {
 
 		if _, ok := rp.interceptors[name]; ok {
 			return fmt.Errorf("failed to load an new interceptor: it already exists an interceptor named %s", name)
@@ -112,7 +112,7 @@ func (c *configurerPoolNew) AddInterceptor(name string, interceptor interceptor.
 	return nil
 }
 
-func New(options ...func(ConfigurerNew) error) (*reloaderProxy, error) {
+func New(options ...func(ConfigurerNew) error) (*proxy, error) {
 
 	configurer := &configurerPoolNew{}
 
@@ -123,7 +123,7 @@ func New(options ...func(ConfigurerNew) error) (*reloaderProxy, error) {
 		}
 	}
 
-	proxy := &reloaderProxy{
+	proxy := &proxy{
 		interceptors: make(map[string]interceptor.Interceptor),
 	}
 

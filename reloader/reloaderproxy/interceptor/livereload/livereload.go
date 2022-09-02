@@ -5,10 +5,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderproxy/interceptor"
+
 	"regexp"
 	"strings"
-
-	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
 )
 
 type Livereload struct {
