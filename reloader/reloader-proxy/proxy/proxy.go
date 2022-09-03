@@ -78,7 +78,7 @@ type Configurer interface {
 	// Endpoint allows set the endpoint frontend url
 	Endpoint(url string) error
 
-	// AddInterceptor allows load a new interceptor that the proxy must be execute by each request.
+	// AddInterceptor allows loading a new interceptor that the proxy must be execute by each request.
 	//
 	// Receives a name to identify the interceptor loaded.
 	AddInterceptor(name string, interceptor interceptor.Interceptor) error

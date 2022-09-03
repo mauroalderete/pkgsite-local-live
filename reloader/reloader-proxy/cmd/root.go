@@ -1,3 +1,4 @@
+// Package cmd implements the command handler
 package cmd
 
 import (
@@ -51,8 +52,14 @@ var (
 			return nil
 		},
 	}
-	origin          string
-	endpoint        string
+
+	// store the url to the backend endpoint passed by arguments
+	origin string
+
+	// store the url to the frontend endpoint passed by arguments
+	endpoint string
+
+	// store the path to the file that contains the snippet to inject by livereload.livereaload interceptor.
 	snippetFilepath string
 )
 
