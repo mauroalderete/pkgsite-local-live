@@ -3,10 +3,12 @@
 package livereload
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"text/template"
 
 	"github.com/mauroalderete/pkgsite-local-live/reloader/reloader-proxy/interceptor"
 
@@ -18,6 +20,7 @@ import (
 type livereload struct {
 	webserviceInjectable string
 	rules                []interceptor.InterceptorRuler
+	reloadEndpoint       string
 }
 
 // Rules implements interceptor.Interceptor.Rules method.
@@ -109,6 +112,9 @@ type Configurer interface {
 	//
 	// Returns an error if failed to get the file or parse it.
 	WebserviceInjectable(path string) error
+
+	// ReloadEndpoint set the reload microservice endpoint that of the snippet must be listen to establish the connection with a websocket.
+	ReloadEndpoint(url string) error
 }
 
 // configurer implement the livereload.Configurer interface.
@@ -138,6 +144,20 @@ func (c *configurer) WebserviceInjectable(path string) error {
 		}
 
 		l.webserviceInjectable = string(content)
+		return nil
+	})
+
+	return nil
+}
+
+func (c *configurer) ReloadEndpoint(url string) error {
+
+	if len(url) == 0 {
+		return fmt.Errorf("reload endpoint cannot be empty")
+	}
+
+	c.pool = append(c.pool, func(l *livereload) error {
+		l.reloadEndpoint = url
 		return nil
 	})
 
@@ -178,6 +198,28 @@ func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 	if len(livereload.webserviceInjectable) == 0 {
 		return nil, fmt.Errorf("a webserviceInjectable is required")
 	}
+
+	if len(livereload.reloadEndpoint) == 0 {
+		return nil, fmt.Errorf("a reload endpoint is required")
+	}
+
+	// Replace the actions in reload snippet
+	payload := struct {
+		ReloadEndpoint string
+	}{
+		ReloadEndpoint: livereload.reloadEndpoint,
+	}
+
+	tmp := template.New("reload_snippet")
+	tmp, _ = tmp.Parse(livereload.webserviceInjectable)
+
+	wr := &bytes.Buffer{}
+	err := tmp.Execute(wr, payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare the injectable snippet script: %v", err)
+	}
+
+	livereload.webserviceInjectable = wr.String()
 
 	return livereload, nil
 }
