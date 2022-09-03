@@ -19,9 +19,9 @@ var (
 	to refresh the webpage loaded in the browsers.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			proxy, err := proxy.New(func(cn proxy.ConfigurerNew) error {
-				cn.SetOrigin(origin)
-				cn.SetEndpoint(endpoint)
+			proxy, err := proxy.New(func(cn proxy.Configurer) error {
+				cn.Origin(origin)
+				cn.Endpoint(endpoint)
 
 				lr, err := livereload.New(func(cn livereload.Configurer) error {
 					err := cn.WebserviceInjectable(snippetFilepath)
