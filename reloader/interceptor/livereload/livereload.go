@@ -10,7 +10,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloader-proxy/interceptor"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
 
 	"regexp"
 	"strings"

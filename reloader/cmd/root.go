@@ -5,22 +5,22 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloader-proxy/interceptor/livereload"
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloader-proxy/proxy"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor/livereload"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/reverseproxy"
 	"github.com/spf13/cobra"
 )
 
 var (
 	rootCmd = &cobra.Command{
-		Use:   "reloader-proxy",
+		Use:   "reloader",
 		Short: "Create a proxy webserver instance that inject a reloader script based websocket",
-		Long: `reloader-proxy is a proxy webserver that replicate a server endpoint and 
+		Long: `reloader is a proxy webserver that replicate a server endpoint and 
 	inject him a javascript snippet on all html requested.
 	It allows that the clients listens a websocket server will expected for a reload signal
 	to refresh the webpage loaded in the browsers.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			proxy, err := proxy.New(func(cn proxy.Configurer) error {
+			proxy, err := reverseproxy.New(func(cn reverseproxy.Configurer) error {
 				cn.Origin(origin)
 				cn.Endpoint(endpoint)
 				cn.Upgrade(upgrade)

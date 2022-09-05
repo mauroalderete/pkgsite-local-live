@@ -1,5 +1,5 @@
-// Package proxy allows instance a simple reverse proxy with capacity to implement many interceptors.
-package proxy
+// Package reverseproxy allows instance a simple reverse proxy with capacity to implement many interceptors.
+package reverseproxy
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"net/http/httputil"
 	neturl "net/url"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloader-proxy/interceptor"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
 )
 
 // proxy execute a reverse proxy and manage the interceptors configured.

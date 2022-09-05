@@ -7,13 +7,13 @@ import (
 	"net/http"
 	neturl "net/url"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloaderwebsocket/connections"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/websocketconnections"
 )
 
 type server struct {
 	endpoint    *neturl.URL
 	server      *http.ServeMux
-	connections map[string]*connections.Connection
+	connections map[string]*websocketconnections.Connection
 }
 
 func (rw *server) responseError(w io.Writer, message error) {
@@ -28,7 +28,7 @@ func (rw *server) responseError(w io.Writer, message error) {
 func (rw *server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[reloadwebsocket] start\n")
 
-	connection, err := connections.New(func(c connections.Configurer) error {
+	connection, err := websocketconnections.New(func(c websocketconnections.Configurer) error {
 		err := c.Request(r)
 		if err != nil {
 			return fmt.Errorf("failed to config request: %v", err)
@@ -133,7 +133,7 @@ func New(options ...func(ConfigurerNew) error) (*server, error) {
 
 	websocket.server = http.NewServeMux()
 
-	websocket.connections = make(map[string]*connections.Connection)
+	websocket.connections = make(map[string]*websocketconnections.Connection)
 	websocket.server.HandleFunc("/", websocket.websocketHandler)
 	websocket.server.HandleFunc("/reload", websocket.reloadHandler)
 

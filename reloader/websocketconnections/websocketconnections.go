@@ -1,5 +1,5 @@
 // package connections allows to handle the websocket connection to reload the clients when is needed.
-package connections
+package websocketconnections
 
 import (
 	"fmt"

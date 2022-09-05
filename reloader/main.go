@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reloader-proxy/cmd"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/cmd"
 )
 
 func main() {
