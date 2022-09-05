@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor/livereload"
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reverseproxy"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/server"
 	"github.com/spf13/cobra"
 )
 
@@ -20,37 +19,27 @@ var (
 	to refresh the webpage loaded in the browsers.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			proxy, err := reverseproxy.New(func(cn reverseproxy.Configurer) error {
-				cn.Origin(origin)
-				cn.Endpoint(endpoint)
-				cn.Upgrade(upgrade)
-
-				lr, err := livereload.New(func(cn livereload.Configurer) error {
-					err := cn.WebserviceInjectable(snippetFilepath)
-					if err != nil {
-						return fmt.Errorf("failed to configure a webservice injectable resource: %v", err)
-					}
-
-					err = cn.UpgradeEndpoint(upgrade)
-					if err != nil {
-						return fmt.Errorf("failed to configure the endpoint to the webservice injectable: %v", err)
-					}
-					return nil
-				})
+			srv, err := server.New(func(c server.Configurator) error {
+				err := c.Origin(origin)
 				if err != nil {
-					return fmt.Errorf("failed to load livereload interceptor: %v", err)
+					return fmt.Errorf("failed to configure the origin address to the server instance:%v", err)
 				}
-				cn.AddInterceptor("livereload", lr)
-
+				err = c.Public(public)
+				if err != nil {
+					return fmt.Errorf("failed to configure the public address to the server instance:%v", err)
+				}
+				err = c.ReloadSnippet(snippetFilepath)
+				if err != nil {
+					return fmt.Errorf("failed to configure the reload snippet path to the server instance:%v", err)
+				}
 				return nil
 			})
-
 			if err != nil {
-				log.Fatalf("Something went wrong to configure the proxy: %v", err)
+				log.Fatalf("Something went wrong to configure the server: %v", err)
 			}
 
-			log.Printf("Start proxy at %s to serve the origin %s\n", origin, endpoint)
-			err = proxy.Run()
+			log.Printf("Start server at %s to serve the origin %s\n", origin, public)
+			err = srv.Run()
 			if err != nil {
 				log.Fatalf("Something went wrong while proxy was running: %v", err)
 			}
@@ -62,14 +51,11 @@ var (
 	// store the url to the backend endpoint passed by arguments
 	origin string
 
-	// store the url to the frontend endpoint passed by arguments
-	endpoint string
+	// store the url to the frontend public passed by arguments
+	public string
 
 	// store the path to the file that contains the snippet to inject by livereload.livereaload interceptor.
 	snippetFilepath string
-
-	// store the url to the reload microservice requeried by the livereload.livereaload interceptor.
-	upgrade string
 )
 
 func Execute() error {
@@ -78,11 +64,9 @@ func Execute() error {
 
 func init() {
 	rootCmd.Flags().StringVarP(&origin, "origin", "o", "", "URL to endpoint that the proxy must be replicate.")
-	rootCmd.Flags().StringVarP(&endpoint, "endpoint", "e", "", "URL to expose origin modified.")
-	rootCmd.Flags().StringVarP(&upgrade, "upgrade", "u", "", "URL to redirect the upgrade type connections.")
+	rootCmd.Flags().StringVarP(&public, "public", "p", "", "URL to expose origin modified.")
 	rootCmd.Flags().StringVarP(&snippetFilepath, "snippet", "s", "", "filepath that contains the html snippet to inject in all html page requested by clients.")
 	rootCmd.MarkFlagRequired("origin")
-	rootCmd.MarkFlagRequired("endpoint")
+	rootCmd.MarkFlagRequired("public")
 	rootCmd.MarkFlagRequired("snippet")
-	rootCmd.MarkFlagRequired("reloadendpoint")
 }

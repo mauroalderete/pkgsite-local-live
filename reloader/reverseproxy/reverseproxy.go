@@ -11,8 +11,8 @@ import (
 	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
 )
 
-// proxy execute a reverse proxy and manage the interceptors configured.
-type proxy struct {
+// ReverseProxy execute a reverse ReverseProxy and manage the interceptors configured.
+type ReverseProxy struct {
 
 	// origin is the backend endpoint that the proxy query by each request of the client.
 	origin *neturl.URL
@@ -30,7 +30,7 @@ type proxy struct {
 	interceptors map[string]interceptor.Interceptor
 }
 
-func (rp *proxy) director(request *http.Request) {
+func (rp *ReverseProxy) director(request *http.Request) {
 	log.Printf("[-------------------------------------------]\n")
 	// log.Printf("\treq %v\n", req.ContentLength)
 	// log.Printf("\treq %v\n", req.Header)
@@ -68,7 +68,7 @@ func redirectTo(request *http.Request, target neturl.URL) {
 }
 
 // modify iterates for each interceptor and executes his handler if needed.
-func (rp *proxy) modify(r *http.Response) error {
+func (rp *ReverseProxy) modify(r *http.Response) error {
 
 	for name, interceptor := range rp.interceptors {
 		accepted := true
@@ -94,11 +94,17 @@ func (rp *proxy) modify(r *http.Response) error {
 }
 
 // Run start to lisent and serve the reverse proxy
-func (rp *proxy) Run() error {
+func (rp *ReverseProxy) Run() error {
 	err := http.ListenAndServe(rp.endpoint.Host, rp.proxy)
 	if err != nil {
 		return fmt.Errorf("reloader proxy failed: %v", err)
 	}
+	return nil
+}
+
+// Run start to lisent and serve the reverse proxy
+func (rp *ReverseProxy) ServeHTTP(response http.ResponseWriter, request *http.Request) error {
+	rp.proxy.ServeHTTP(response, request)
 	return nil
 }
 
@@ -122,7 +128,7 @@ type Configurer interface {
 
 // configurerPool implements proxy.Configurer
 type configurerPool struct {
-	pool []func(*proxy) error
+	pool []func(*ReverseProxy) error
 }
 
 // Origin implements proxy.Configurer.Origin method
@@ -133,7 +139,7 @@ func (c *configurerPool) Origin(url string) error {
 		return fmt.Errorf("failed to parse origin url: %v", err)
 	}
 
-	c.pool = append(c.pool, func(rp *proxy) error {
+	c.pool = append(c.pool, func(rp *ReverseProxy) error {
 		rp.origin = addr
 		return nil
 	})
@@ -149,7 +155,7 @@ func (c *configurerPool) Endpoint(url string) error {
 		return fmt.Errorf("failed to parse endpoint url: %v", err)
 	}
 
-	c.pool = append(c.pool, func(rp *proxy) error {
+	c.pool = append(c.pool, func(rp *ReverseProxy) error {
 		rp.endpoint = addr
 		return nil
 	})
@@ -165,7 +171,7 @@ func (c *configurerPool) Upgrade(url string) error {
 		return fmt.Errorf("failed to parse origin url: %v", err)
 	}
 
-	c.pool = append(c.pool, func(rp *proxy) error {
+	c.pool = append(c.pool, func(rp *ReverseProxy) error {
 		rp.upgrade = addr
 		return nil
 	})
@@ -176,7 +182,7 @@ func (c *configurerPool) Upgrade(url string) error {
 // AddInterceptor implements proxy.Configurer.AddInterceptor method
 func (c *configurerPool) AddInterceptor(name string, interceptor interceptor.Interceptor) error {
 
-	c.pool = append(c.pool, func(rp *proxy) error {
+	c.pool = append(c.pool, func(rp *ReverseProxy) error {
 
 		if _, ok := rp.interceptors[name]; ok {
 			return fmt.Errorf("failed to load an new interceptor: it already exists an interceptor named %s", name)
@@ -192,7 +198,7 @@ func (c *configurerPool) AddInterceptor(name string, interceptor interceptor.Int
 // New returns a new proxy instaceconfigured
 //
 // Receives a list of options callback with the configurations to apply.
-func New(options ...func(Configurer) error) (*proxy, error) {
+func New(options ...func(Configurer) error) (*ReverseProxy, error) {
 
 	configurer := &configurerPool{}
 
@@ -203,7 +209,7 @@ func New(options ...func(Configurer) error) (*proxy, error) {
 		}
 	}
 
-	proxy := &proxy{
+	proxy := &ReverseProxy{
 		interceptors: make(map[string]interceptor.Interceptor),
 	}
 

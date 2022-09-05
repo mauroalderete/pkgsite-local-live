@@ -18,13 +18,11 @@
 					parent.appendChild(elem);
 				}
 			}
-			var address = window.location.href
-			if (address.startsWith("http://")) {
-				address = address.replace("http://", "ws://")
-			} else if (address.startsWith("https://")) {
-				address = address.replace("https://", "wss://")
+			var address
+			if (window.location.protocol === 'https:') {
+				address = `wss://${window.location.host}/ws`
 			} else {
-				address += "ws://"
+				address = `ws://${window.location.host}/ws`
 			}
 			var socket = new WebSocket(address);
 			socket.onmessage = function (msg) {
