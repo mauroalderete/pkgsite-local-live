@@ -1,3 +1,4 @@
+// package connections allows to handle the websocket connection to reload the clients when is needed.
 package connections
 
 import (
@@ -11,6 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Connection models a connection to the client toghether a websocket.
+//
+// It allow upgrade a request recived to initilize a websocket connection. Manage the connection lifecicle.
 type Connection struct {
 	uuid       uuid.UUID
 	response   http.ResponseWriter
@@ -125,15 +129,21 @@ func (c *Connection) watch() {
 	}
 }
 
+// Configurer defines the configurable options to build a new Connection instance
 type Configurer interface {
+	// ResponseWriter allows set the request response received by the client.
 	ResponseWriter(response http.ResponseWriter) error
+
+	// Request allows set the request instance received by the client.
 	Request(request *http.Request) error
 }
 
+// configurerPool implements connections.Configurer interface
 type configurerPool struct {
 	pool []func(c *Connection) error
 }
 
+// ResponseWriter implements connections.ResponseWriter method
 func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -144,6 +154,7 @@ func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 	return nil
 }
 
+// Request implements connections.Request method
 func (cp *configurerPool) Request(request *http.Request) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -154,6 +165,7 @@ func (cp *configurerPool) Request(request *http.Request) error {
 	return nil
 }
 
+// New returns a Connection instance with request and response instanced configured.
 func New(options ...func(Configurer) error) (*Connection, error) {
 
 	configuration := &configurerPool{}

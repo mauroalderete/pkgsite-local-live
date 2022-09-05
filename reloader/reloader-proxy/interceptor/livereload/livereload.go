@@ -3,12 +3,12 @@
 package livereload
 
 import (
-	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
-	"text/template"
+	"strconv"
 
 	"github.com/mauroalderete/pkgsite-local-live/reloader/reloader-proxy/interceptor"
 
@@ -20,7 +20,7 @@ import (
 type livereload struct {
 	webserviceInjectable string
 	rules                []interceptor.InterceptorRuler
-	reloadEndpoint       string
+	upgradeEndpoint      string
 }
 
 // Rules implements interceptor.Interceptor.Rules method.
@@ -50,6 +50,8 @@ func (l *livereload) Handler() interceptor.InterceptorHandler {
 		contentModified += content[location[0]:]
 
 		r.Body = io.NopCloser(strings.NewReader(contentModified))
+		r.ContentLength = int64(len(contentModified))
+		r.Header.Set("Content-Length", strconv.Itoa(len(contentModified)))
 
 		return nil
 	}
@@ -57,13 +59,27 @@ func (l *livereload) Handler() interceptor.InterceptorHandler {
 
 // statusCodeRule validates that the response requested has a status code 200.
 func statusCodeRule(r *http.Response) bool {
-	return r.StatusCode == 200
+	log.Printf("[rule] statusCode %v\n", r.StatusCode)
+
+	switch r.StatusCode {
+	case 200, 304:
+		return true
+	default:
+		return false
+	}
 }
 
 // contentTypeRule validates that the content-type of the response requested is a `text/hmlt`
 func contentTypeRule(r *http.Response) bool {
+
+	if _, ok := r.Header["Content-Type"]; !ok {
+		return true
+	}
+
 	isTextHML := false
-	for _, v := range r.Header["Content-Type"] {
+
+	for k, v := range r.Header["Content-Type"] {
+		log.Printf("[rule] header %v:%v\n", k, v)
 		if strings.Contains(v, "text/html") {
 			isTextHML = true
 			break
@@ -80,7 +96,7 @@ func hasOneBodyTagRule(r *http.Response) bool {
 		return false
 	}
 
-	openTagExp := regexp.MustCompile("<body>")
+	openTagExp := regexp.MustCompile("<body")
 	closeTagExp := regexp.MustCompile("</body>")
 	openTagMatchs := openTagExp.FindAll([]byte(content), -1)
 	closeTagMatchs := closeTagExp.FindAll([]byte(content), -1)
@@ -113,8 +129,8 @@ type Configurer interface {
 	// Returns an error if failed to get the file or parse it.
 	WebserviceInjectable(path string) error
 
-	// ReloadEndpoint set the reload microservice endpoint that of the snippet must be listen to establish the connection with a websocket.
-	ReloadEndpoint(url string) error
+	// UpgradeEndpoint set the reload microservice endpoint that of the snippet must be listen to establish the connection with a websocket.
+	UpgradeEndpoint(url string) error
 }
 
 // configurer implement the livereload.Configurer interface.
@@ -150,14 +166,14 @@ func (c *configurer) WebserviceInjectable(path string) error {
 	return nil
 }
 
-func (c *configurer) ReloadEndpoint(url string) error {
+func (c *configurer) UpgradeEndpoint(url string) error {
 
 	if len(url) == 0 {
 		return fmt.Errorf("reload endpoint cannot be empty")
 	}
 
 	c.pool = append(c.pool, func(l *livereload) error {
-		l.reloadEndpoint = url
+		l.upgradeEndpoint = url
 		return nil
 	})
 
@@ -199,27 +215,9 @@ func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 		return nil, fmt.Errorf("a webserviceInjectable is required")
 	}
 
-	if len(livereload.reloadEndpoint) == 0 {
+	if len(livereload.upgradeEndpoint) == 0 {
 		return nil, fmt.Errorf("a reload endpoint is required")
 	}
-
-	// Replace the actions in reload snippet
-	payload := struct {
-		ReloadEndpoint string
-	}{
-		ReloadEndpoint: livereload.reloadEndpoint,
-	}
-
-	tmp := template.New("reload_snippet")
-	tmp, _ = tmp.Parse(livereload.webserviceInjectable)
-
-	wr := &bytes.Buffer{}
-	err := tmp.Execute(wr, payload)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare the injectable snippet script: %v", err)
-	}
-
-	livereload.webserviceInjectable = wr.String()
 
 	return livereload, nil
 }

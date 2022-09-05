@@ -3,6 +3,7 @@ package proxy
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	neturl "net/url"
@@ -19,6 +20,9 @@ type proxy struct {
 	// endpoint is the frontend endpoint for clients to access.
 	endpoint *neturl.URL
 
+	// upgrade is the backend endpoint to connections of upgrade type incoming.
+	upgrade *neturl.URL
+
 	// proxy is the httputil.ReverseProxy instance that is executed.
 	proxy *httputil.ReverseProxy
 
@@ -26,18 +30,47 @@ type proxy struct {
 	interceptors map[string]interceptor.Interceptor
 }
 
-func (rp *proxy) director(req *http.Request) {
-	req.Host = rp.origin.Host
-	req.URL.Host = rp.origin.Host
-	req.URL.Scheme = rp.origin.Scheme
-	req.RequestURI = ""
+func (rp *proxy) director(request *http.Request) {
+	log.Printf("[-------------------------------------------]\n")
+	// log.Printf("\treq %v\n", req.ContentLength)
+	// log.Printf("\treq %v\n", req.Header)
+	// log.Printf("\treq %v\n", req.Host)
+	// log.Printf("\treq %v\n", req.Method)
+	// log.Printf("\treq %v\n", req.Proto)
+	// log.Printf("\treq %v\n", req.RemoteAddr)
+	// log.Printf("\treq %v\n", req.RequestURI)
+	// log.Printf("\treq %v\n", req.URL)
+	// log.Printf("\treq %v\n", req.URL.Host)
+	// log.Printf("\treq %v\n", req.URL.Path)
+	// log.Printf("\treq %v\n", req.URL.Scheme)
+	// log.Printf("\treq %v\n", req.URL.User)
+	// log.Printf("\treq %v\n", req.URL.Opaque)
+
+	log.Printf("[director] before %v %v %v\n", request.Host, request.URL.Host, request.URL.Scheme)
+
+	if request.Header.Get("Connection") == "Upgrade" &&
+		request.Header.Get("Upgrade") == "websocket" &&
+		rp.upgrade != nil {
+		redirectTo(request, *rp.upgrade)
+		log.Printf("[director] after by upgrade %v %v %v\n", request.Host, request.URL.Host, request.URL.Scheme)
+		return
+	}
+
+	redirectTo(request, *rp.origin)
+	log.Printf("[director] after by default %v %v %v\n", request.Host, request.URL.Host, request.URL.Scheme)
+}
+
+func redirectTo(request *http.Request, target neturl.URL) {
+	request.Host = target.Host
+	request.URL.Host = target.Host
+	request.URL.Scheme = target.Scheme
+	request.RequestURI = ""
 }
 
 // modify iterates for each interceptor and executes his handler if needed.
 func (rp *proxy) modify(r *http.Response) error {
 
 	for name, interceptor := range rp.interceptors {
-
 		accepted := true
 		for _, rule := range interceptor.Rules() {
 			if !rule(r) {
@@ -78,6 +111,9 @@ type Configurer interface {
 	// Endpoint allows set the endpoint frontend url
 	Endpoint(url string) error
 
+	// Upgrade allows set the endpoint to connections upgrade type.
+	Upgrade(url string) error
+
 	// AddInterceptor allows loading a new interceptor that the proxy must be execute by each request.
 	//
 	// Receives a name to identify the interceptor loaded.
@@ -92,13 +128,13 @@ type configurerPool struct {
 // Origin implements proxy.Configurer.Origin method
 func (c *configurerPool) Origin(url string) error {
 
-	o, err := neturl.Parse(url)
+	addr, err := neturl.Parse(url)
 	if err != nil {
 		return fmt.Errorf("failed to parse origin url: %v", err)
 	}
 
 	c.pool = append(c.pool, func(rp *proxy) error {
-		rp.origin = o
+		rp.origin = addr
 		return nil
 	})
 
@@ -108,13 +144,29 @@ func (c *configurerPool) Origin(url string) error {
 // Endpoint implements proxy.Configurer.Endpoint method
 func (c *configurerPool) Endpoint(url string) error {
 
-	o, err := neturl.Parse(url)
+	addr, err := neturl.Parse(url)
 	if err != nil {
 		return fmt.Errorf("failed to parse endpoint url: %v", err)
 	}
 
 	c.pool = append(c.pool, func(rp *proxy) error {
-		rp.endpoint = o
+		rp.endpoint = addr
+		return nil
+	})
+
+	return nil
+}
+
+// Upgrade implements proxy.Configurer.Upgrade method
+func (c *configurerPool) Upgrade(url string) error {
+
+	addr, err := neturl.Parse(url)
+	if err != nil {
+		return fmt.Errorf("failed to parse origin url: %v", err)
+	}
+
+	c.pool = append(c.pool, func(rp *proxy) error {
+		rp.upgrade = addr
 		return nil
 	})
 
@@ -158,6 +210,7 @@ func New(options ...func(Configurer) error) (*proxy, error) {
 	proxy.proxy = &httputil.ReverseProxy{
 		Director:       proxy.director,
 		ModifyResponse: proxy.modify,
+		ErrorLog:       log.Default(),
 	}
 
 	for _, config := range configurer.pool {

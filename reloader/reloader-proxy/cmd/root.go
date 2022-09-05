@@ -23,6 +23,7 @@ var (
 			proxy, err := proxy.New(func(cn proxy.Configurer) error {
 				cn.Origin(origin)
 				cn.Endpoint(endpoint)
+				cn.Upgrade(upgrade)
 
 				lr, err := livereload.New(func(cn livereload.Configurer) error {
 					err := cn.WebserviceInjectable(snippetFilepath)
@@ -30,7 +31,7 @@ var (
 						return fmt.Errorf("failed to configure a webservice injectable resource: %v", err)
 					}
 
-					err = cn.ReloadEndpoint(reloadEndpoint)
+					err = cn.UpgradeEndpoint(upgrade)
 					if err != nil {
 						return fmt.Errorf("failed to configure the endpoint to the webservice injectable: %v", err)
 					}
@@ -68,7 +69,7 @@ var (
 	snippetFilepath string
 
 	// store the url to the reload microservice requeried by the livereload.livereaload interceptor.
-	reloadEndpoint string
+	upgrade string
 )
 
 func Execute() error {
@@ -78,8 +79,8 @@ func Execute() error {
 func init() {
 	rootCmd.Flags().StringVarP(&origin, "origin", "o", "", "URL to endpoint that the proxy must be replicate.")
 	rootCmd.Flags().StringVarP(&endpoint, "endpoint", "e", "", "URL to expose origin modified.")
+	rootCmd.Flags().StringVarP(&upgrade, "upgrade", "u", "", "URL to redirect the upgrade type connections.")
 	rootCmd.Flags().StringVarP(&snippetFilepath, "snippet", "s", "", "filepath that contains the html snippet to inject in all html page requested by clients.")
-	rootCmd.Flags().StringVarP(&reloadEndpoint, "reloadendpoint", "r", "", "URL to reload microservice endpoint.")
 	rootCmd.MarkFlagRequired("origin")
 	rootCmd.MarkFlagRequired("endpoint")
 	rootCmd.MarkFlagRequired("snippet")

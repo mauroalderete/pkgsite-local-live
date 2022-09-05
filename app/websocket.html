@@ -18,7 +18,7 @@
 					parent.appendChild(elem);
 				}
 			}
-			var address = '{{.ReloadEndpoint}}'
+			var address = window.location.href
 			if (address.startsWith("http://")) {
 				address = address.replace("http://", "ws://")
 			} else if (address.startsWith("https://")) {

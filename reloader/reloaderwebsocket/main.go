@@ -9,7 +9,7 @@ import (
 
 func main() {
 	websocket, err := server.New(func(cn server.ConfigurerNew) error {
-		err := cn.Endpoint("localhost:9091")
+		err := cn.Endpoint("localhost:9090")
 		if err != nil {
 			return fmt.Errorf("failed to configure endpoint of the new reloader websocket: %v", err)
 		}
