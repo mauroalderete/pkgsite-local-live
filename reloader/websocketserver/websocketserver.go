@@ -1,4 +1,4 @@
-package server
+package websocketserver
 
 import (
 	"fmt"
@@ -10,13 +10,13 @@ import (
 	"github.com/mauroalderete/pkgsite-local-live/reloader/websocketconnections"
 )
 
-type server struct {
+type WebsocketServer struct {
 	endpoint    *neturl.URL
 	server      *http.ServeMux
 	connections map[string]*websocketconnections.Connection
 }
 
-func (rw *server) responseError(w io.Writer, message error) {
+func (rw *WebsocketServer) responseError(w io.Writer, message error) {
 	log.Println(message.Error())
 
 	_, err := io.WriteString(w, message.Error())
@@ -25,7 +25,7 @@ func (rw *server) responseError(w io.Writer, message error) {
 	}
 }
 
-func (rw *server) websocketHandler(w http.ResponseWriter, r *http.Request) {
+func (rw *WebsocketServer) WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[reloadwebsocket] start\n")
 
 	connection, err := websocketconnections.New(func(c websocketconnections.Configurer) error {
@@ -65,7 +65,7 @@ func (rw *server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	defer connection.Close()
 }
 
-func (rw *server) reloadHandler(w http.ResponseWriter, r *http.Request) {
+func (rw *WebsocketServer) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Emit broadcasting signal to reload\n")
 
 	for _, conn := range rw.connections {
@@ -74,7 +74,7 @@ func (rw *server) reloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (rw *server) Run() {
+func (rw *WebsocketServer) Run() {
 	log.Printf("[reloadwebsocket] Running at %s\n", rw.endpoint.String())
 	err := http.ListenAndServe(rw.endpoint.String(), rw.server)
 	if err != nil {
@@ -82,25 +82,25 @@ func (rw *server) Run() {
 	}
 }
 
-func (rw *server) Stop() {
+func (rw *WebsocketServer) Stop() {
 }
 
-type ConfigurerNew interface {
+type Configurator interface {
 	Endpoint(url string) error
 }
 
-type configurerPoolNew struct {
-	pool []func(*server) error
+type configurer struct {
+	pool []func(*WebsocketServer) error
 }
 
-func (c *configurerPoolNew) Endpoint(url string) error {
+func (c *configurer) Endpoint(url string) error {
 
 	endpoint, err := neturl.Parse(url)
 	if err != nil {
 		return fmt.Errorf("failed to parse origin url: %v", err)
 	}
 
-	c.pool = append(c.pool, func(rw *server) error {
+	c.pool = append(c.pool, func(rw *WebsocketServer) error {
 		rw.endpoint = endpoint
 		return nil
 	})
@@ -108,8 +108,8 @@ func (c *configurerPoolNew) Endpoint(url string) error {
 	return nil
 }
 
-func New(options ...func(ConfigurerNew) error) (*server, error) {
-	configurer := &configurerPoolNew{}
+func New(options ...func(Configurator) error) (*WebsocketServer, error) {
+	configurer := &configurer{}
 
 	for _, option := range options {
 		err := option(configurer)
@@ -118,7 +118,7 @@ func New(options ...func(ConfigurerNew) error) (*server, error) {
 		}
 	}
 
-	websocket := &server{}
+	websocket := &WebsocketServer{}
 
 	for _, config := range configurer.pool {
 		err := config(websocket)
@@ -134,8 +134,8 @@ func New(options ...func(ConfigurerNew) error) (*server, error) {
 	websocket.server = http.NewServeMux()
 
 	websocket.connections = make(map[string]*websocketconnections.Connection)
-	websocket.server.HandleFunc("/", websocket.websocketHandler)
-	websocket.server.HandleFunc("/reload", websocket.reloadHandler)
+	websocket.server.HandleFunc("/", websocket.WebsocketHandler)
+	websocket.server.HandleFunc("/reload", websocket.ReloadHandler)
 
 	return websocket, nil
 }

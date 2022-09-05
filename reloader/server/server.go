@@ -8,6 +8,7 @@ import (
 
 	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor/livereload"
 	"github.com/mauroalderete/pkgsite-local-live/reloader/reverseproxy"
+	"github.com/mauroalderete/pkgsite-local-live/reloader/websocketserver"
 )
 
 type server struct {
@@ -15,18 +16,31 @@ type server struct {
 	public            *url.URL
 	reloadSnippetPath string
 	proxy             *reverseproxy.ReverseProxy
+	websocket         *websocketserver.WebsocketServer
 }
 
 func (s *server) Run() error {
 
 	serverMux := http.NewServeMux()
-	serverMux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+
+	// handler to accept a new websocket connection
+	serverMux.HandleFunc("/ws", func(response http.ResponseWriter, request *http.Request) {
 		log.Printf("must to upgrade connection")
+
+		s.websocket.WebsocketHandler(response, request)
 	})
 
-	serverMux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// handler to send broadcast reload signal
+	serverMux.HandleFunc("/ws/reload", func(response http.ResponseWriter, request *http.Request) {
+		log.Printf("must to broadcast reload signal")
+
+		s.websocket.ReloadHandler(response, request)
+	})
+
+	// handler to redirect any connection
+	serverMux.HandleFunc("/", func(response http.ResponseWriter, request *http.Request) {
 		log.Printf("must to redirect")
-		s.proxy.ServeHTTP(w, r)
+		s.proxy.ServeHTTP(response, request)
 	})
 
 	err := http.ListenAndServe(s.public.Host, serverMux)
@@ -118,6 +132,7 @@ func New(options ...func(Configurator) error) (*server, error) {
 		return nil, fmt.Errorf("public address is required")
 	}
 
+	// load a reverse proxy instance
 	rp, err := reverseproxy.New(func(c reverseproxy.Configurer) error {
 		err := c.Origin(srv.origin.String())
 		if err != nil {
@@ -154,6 +169,20 @@ func New(options ...func(Configurator) error) (*server, error) {
 	}
 
 	srv.proxy = rp
+
+	// prepare a websocket server
+	ws, err := websocketserver.New(func(c websocketserver.Configurator) error {
+		err = c.Endpoint(srv.public.Host)
+		if err != nil {
+			return fmt.Errorf("failed to set endpoint to websocket server: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to up the websocket server: %v", err)
+	}
+
+	srv.websocket = ws
 
 	return srv, nil
 }
