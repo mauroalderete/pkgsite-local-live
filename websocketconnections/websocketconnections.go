@@ -1,4 +1,4 @@
-// package connections allows to handle the websocket connection to reload the clients when is needed.
+// Package connections allows to handle the websocket connection to reload the clients when is needed.
 package websocketconnections
 
 import (
@@ -14,7 +14,7 @@ import (
 
 // Connection models a connection to the client toghether a websocket.
 //
-// It allow upgrade a request recived to initilize a websocket connection. Manage the connection lifecicle.
+// It allows upgrade a request recived to initilize a websocket connection. Manage the connection lifecicle.
 type Connection struct {
 	uuid       uuid.UUID
 	response   http.ResponseWriter
@@ -52,7 +52,7 @@ func (c *Connection) Open() error {
 	return nil
 }
 
-// Start execute the go routines to begin to listen the messages and watch the status connection.
+// Start executes the go routines to begin to listen the messages and watch the status connection.
 func (c *Connection) Start() error {
 
 	c.stop = make(chan bool)
@@ -139,7 +139,7 @@ func (c *Connection) watch() {
 	}
 }
 
-// Configurer defines the configurable options to build a new Connection instance
+// Configurer defines the configurable options to build a new Connection instance.
 type Configurer interface {
 	// ResponseWriter allows set the request response received by the client.
 	ResponseWriter(response http.ResponseWriter) error
@@ -148,12 +148,12 @@ type Configurer interface {
 	Request(request *http.Request) error
 }
 
-// configurerPool implements connections.Configurer interface
+// configurerPool implements [websocketconnections.Configurer] interface.
 type configurerPool struct {
 	pool []func(c *Connection) error
 }
 
-// ResponseWriter implements connections.ResponseWriter method
+// ResponseWriter implements [http.ResponseWriter] method.
 func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -164,7 +164,7 @@ func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 	return nil
 }
 
-// Request implements connections.Request method
+// Request implements [http.Request] method.
 func (cp *configurerPool) Request(request *http.Request) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -175,7 +175,7 @@ func (cp *configurerPool) Request(request *http.Request) error {
 	return nil
 }
 
-// New returns a Connection instance with request and response instanced configured.
+// New returns a [websocketconnections.Connection] instance with request and response instanced configured.
 func New(options ...func(Configurer) error) (*Connection, error) {
 
 	configuration := &configurerPool{}

@@ -1,4 +1,4 @@
-// Package websocketserver contains a websocket server that support multiple connections to send a reload signal
+// Package websocketserver contains a websocket server that support multiple connections to send a reload signal.
 package websocketserver
 
 import (
@@ -18,7 +18,7 @@ type WebsocketServer struct {
 	connections map[string]*websocketconnections.Connection
 }
 
-// responseError writes an error message and print it although standar logger
+// responseError writes an error message and print it although standar logger.
 //
 // This method is used to simplify the error response when a request process failed.
 func (rw *WebsocketServer) responseError(w io.Writer, message error) {
@@ -85,7 +85,7 @@ func (rw *WebsocketServer) WebsocketHandler(w http.ResponseWriter, r *http.Reque
 
 // ReloadHandler sends reload signal to all connections stored.
 //
-// The arguments aren't used, but it is maintain to compatibility with http.Handler interface
+// The arguments aren't used, but it is maintain to compatibility with [http.Handler] interface.
 func (rw *WebsocketServer) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	for _, conn := range rw.connections {
 		log.Printf("send reload signal to %s connection\n", conn.UUID())
@@ -105,26 +105,26 @@ func (rw *WebsocketServer) Run() error {
 	return nil
 }
 
-// Stop allows stop all connections
+// Stop allows stop all connections.
 func (rw *WebsocketServer) Stop() {
 	for _, conn := range rw.connections {
 		conn.Stop()
 	}
 }
 
-// Configurator defines the optionable configurations to instance a new WebsocketServer
+// Configurator defines the optionable configurations to instance a new WebsocketServer.
 type Configurator interface {
 
-	// Endpoint allows set the endpoint address of the websocket
+	// Endpoint allows set the endpoint address of the websocket.
 	Endpoint(url string) error
 }
 
-// configurer implements websocketserver.Configurator. Maintains a pool with configurations to execute.
+// configurer implements [websocketserver.Configurator]. Maintains a pool with configurations to execute.
 type configurer struct {
 	pool []func(*WebsocketServer) error
 }
 
-// Endpoint implements websocketserver.Configurator.Endpoint method.
+// Endpoint implements [websocketserver.Configurator.Endpoint] method.
 func (c *configurer) Endpoint(url string) error {
 
 	endpoint, err := neturl.Parse(url)
@@ -140,9 +140,9 @@ func (c *configurer) Endpoint(url string) error {
 	return nil
 }
 
-// New returns a new WebsocketServer instance with the endpoint set.
+// New returns a new [websocketserver.WebsocketServer] instance with the endpoint set.
 //
-// Initializes a http.ServerMux with the two routes to handle new websocket connections and reload signal
+// Initializes a [http.ServerMux] with the two routes to handle new websocket connections and reload signal.
 func New(options ...func(Configurator) error) (*WebsocketServer, error) {
 	configurer := &configurer{}
 

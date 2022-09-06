@@ -5,7 +5,6 @@ package livereload
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -16,26 +15,26 @@ import (
 	"strings"
 )
 
-// livereload implements interceptor.Interceptor interface
-type livereload struct {
+// Livereload implements [interceptor.Interceptor] interface
+type Livereload struct {
 	webserviceInjectable string
 	rules                []interceptor.InterceptorRuler
 	upgradeEndpoint      string
 }
 
-// Rules implements interceptor.Interceptor.Rules method.
-// Returns a list of interceptor.InterceptorRuler loaded with the rules needed to inject the snippet.
-// The rules are loaded during the build of a instance of livereload.livereload.
-func (l *livereload) Rules() []interceptor.InterceptorRuler {
+// Rules implements [interceptor.Interceptor.Rules] method.
+// Returns a list of [interceptor.InterceptorRuler] loaded with the rules needed to inject the snippet.
+// The rules are loaded during the build of a instance of [livereload.Livereload].
+func (l *Livereload) Rules() []interceptor.InterceptorRuler {
 	return l.rules
 }
 
-// Handler implements interceptor.Interceptor.Handler method.
+// Handler implements [interceptor.Interceptor.Handler] method.
 // Returns a interceptor.InterceptorHandler callback.
 //
-// The method returned access to the content and inject before tha tag `</body>`
-// the snippet passed as option during the build of a instance of liverreload.livereload.
-func (l *livereload) Handler() interceptor.InterceptorHandler {
+// The method returned access to the content and inject before the tag `</body>`
+// the snippet passed as option during the build of a instance of [liverreload.livereload].
+func (l *Livereload) Handler() interceptor.InterceptorHandler {
 	return func(r *http.Response) error {
 		content, err := getBody(r)
 		if err != nil {
@@ -59,8 +58,6 @@ func (l *livereload) Handler() interceptor.InterceptorHandler {
 
 // statusCodeRule validates that the response requested has a status code 200.
 func statusCodeRule(r *http.Response) bool {
-	log.Printf("[rule] statusCode %v\n", r.StatusCode)
-
 	switch r.StatusCode {
 	case 200, 304:
 		return true
@@ -69,7 +66,7 @@ func statusCodeRule(r *http.Response) bool {
 	}
 }
 
-// contentTypeRule validates that the content-type of the response requested is a `text/hmlt`
+// contentTypeRule validates that the content-type of the response requested is a `text/hmlt`.
 func contentTypeRule(r *http.Response) bool {
 
 	if _, ok := r.Header["Content-Type"]; !ok {
@@ -78,8 +75,7 @@ func contentTypeRule(r *http.Response) bool {
 
 	isTextHML := false
 
-	for k, v := range r.Header["Content-Type"] {
-		log.Printf("[rule] header %v:%v\n", k, v)
+	for _, v := range r.Header["Content-Type"] {
 		if strings.Contains(v, "text/html") {
 			isTextHML = true
 			break
@@ -121,27 +117,29 @@ func getBody(r *http.Response) (string, error) {
 	return string(body), nil
 }
 
-// Configurer define the configurable options to build a new instance of livereload.livereload
+// Configurer define the configurable options to build a new instance of [livereload.Livereload].
 type Configurer interface {
 
-	// WebserviceInjectable receives the path of file that contains the snippet that must be injected in the body content.
+	// WebserviceInjectable receives the path of file that contains the snippet
+	// that must be injected in the body content.
 	//
 	// Returns an error if failed to get the file or parse it.
 	WebserviceInjectable(path string) error
 
-	// UpgradeEndpoint set the reload microservice endpoint that of the snippet must be listen to establish the connection with a websocket.
+	// UpgradeEndpoint set the reload microservice endpoint that the snippet must be listened
+	// to establish the connection with a WebSocket.
 	UpgradeEndpoint(url string) error
 }
 
-// configurer implement the livereload.Configurer interface.
+// configurer implement the [livereload.Configurer] interface.
 //
 // It stores in a pool the callbacks with the configurable options
-// that must be called by the constructor of livereload.livereload to apply the configurations.
+// that must be called by the constructor of [livereload.Livereload] to apply the configurations.
 type configurer struct {
-	pool []func(l *livereload) error
+	pool []func(l *Livereload) error
 }
 
-// WebserviceInjectable implements livereload.Configurer.WebserviceInjectable method.
+// WebserviceInjectable implements [livereload.Configurer.WebserviceInjectable] method.
 //
 // Add to the pool the function needed to open and read the snippet file.
 func (c *configurer) WebserviceInjectable(path string) error {
@@ -149,7 +147,7 @@ func (c *configurer) WebserviceInjectable(path string) error {
 		return fmt.Errorf("path cannot be empty")
 	}
 
-	c.pool = append(c.pool, func(l *livereload) error {
+	c.pool = append(c.pool, func(l *Livereload) error {
 		file, err := os.Open(path)
 		if err != nil {
 			return fmt.Errorf("failed load webservice injectable resource from %s: %v", path, err)
@@ -172,7 +170,7 @@ func (c *configurer) UpgradeEndpoint(url string) error {
 		return fmt.Errorf("reload endpoint cannot be empty")
 	}
 
-	c.pool = append(c.pool, func(l *livereload) error {
+	c.pool = append(c.pool, func(l *Livereload) error {
 		l.upgradeEndpoint = url
 		return nil
 	})
@@ -180,14 +178,14 @@ func (c *configurer) UpgradeEndpoint(url string) error {
 	return nil
 }
 
-// New returns a livereload.livereload instance that implements the interceptor.Interceptor interface.
+// New returns a [livereload.Livereload] instance that implements the [interceptor.Interceptor] interface.
 //
 // Receive a list of configurations callback to apply the options.
 // It function try to access to the file with the snippet to inject
 // and configures the rules needed to identify the request that must be injected.
 func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 
-	livereload := &livereload{
+	livereload := &Livereload{
 		rules: []interceptor.InterceptorRuler{
 			statusCodeRule,
 			contentTypeRule,

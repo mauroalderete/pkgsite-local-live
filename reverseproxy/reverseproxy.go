@@ -11,7 +11,7 @@ import (
 	"github.com/mauroalderete/pkgsite-local-live/interceptor"
 )
 
-// ReverseProxy execute a reverse ReverseProxy and manage the interceptors configured.
+// ReverseProxy execute a [httputil.ReverseProxy] and manage the interceptors configured.
 type ReverseProxy struct {
 
 	// origin is the backend endpoint that the proxy query by each request of the client.
@@ -20,10 +20,10 @@ type ReverseProxy struct {
 	// endpoint is the frontend endpoint for clients to access.
 	endpoint *url.URL
 
-	// proxy is the httputil.ReverseProxy instance that is executed.
+	// proxy is the [httputil.ReverseProxy] instance that is executed.
 	proxy *httputil.ReverseProxy
 
-	// interceptors is a list of the all interceptor.Interceptor configured.
+	// interceptors is a list of the all [interceptor.Interceptor] configured.
 	interceptors map[string]interceptor.Interceptor
 }
 
@@ -75,7 +75,7 @@ func (rp *ReverseProxy) Run() error {
 	return nil
 }
 
-// ServeHTTP allows execute a request parse manually
+// ServeHTTP implements [http.Handler] interface. It allows execute a request parse manually.
 //
 // Receives the request data that the reverse proxy handle to apply the correspondent redirection.
 func (rp *ReverseProxy) ServeHTTP(response http.ResponseWriter, request *http.Request) error {
@@ -83,13 +83,13 @@ func (rp *ReverseProxy) ServeHTTP(response http.ResponseWriter, request *http.Re
 	return nil
 }
 
-// Configurer defines the available options to configure a new instance of proxy.proxy
+// Configurer defines the available options to configure a new instance of [reverseproxy.ReverseProxy].
 type Configurer interface {
 
-	// Origin allows set the endpoint backend url
+	// Origin allows set the endpoint backend url.
 	Origin(address string) error
 
-	// Public allows set the endpoint frontend url
+	// Public allows set the endpoint frontend url.
 	Public(address string) error
 
 	// AddInterceptor allows loading a new interceptor that the proxy must be execute by each request.
@@ -98,12 +98,12 @@ type Configurer interface {
 	AddInterceptor(name string, interceptor interceptor.Interceptor) error
 }
 
-// configurerPool implements proxy.Configurer
+// configurerPool implements [reverseproxy.Configurer].
 type configurerPool struct {
 	pool []func(*ReverseProxy) error
 }
 
-// Origin implements proxy.Configurer.Origin method
+// Origin implements [reverseproxy.Configurer.Origin] method.
 func (c *configurerPool) Origin(address string) error {
 
 	addr, err := url.Parse(address)
@@ -119,7 +119,7 @@ func (c *configurerPool) Origin(address string) error {
 	return nil
 }
 
-// Endpoint implements proxy.Configurer.Endpoint method
+// Endpoint implements [reverseproxy.Configurer.Endpoint] method.
 func (c *configurerPool) Public(address string) error {
 
 	addr, err := url.Parse(address)
@@ -135,7 +135,7 @@ func (c *configurerPool) Public(address string) error {
 	return nil
 }
 
-// AddInterceptor implements proxy.Configurer.AddInterceptor method
+// AddInterceptor implements [reverseproxy.Configurer.AddInterceptor] method.
 func (c *configurerPool) AddInterceptor(name string, interceptor interceptor.Interceptor) error {
 
 	c.pool = append(c.pool, func(rp *ReverseProxy) error {
@@ -151,7 +151,7 @@ func (c *configurerPool) AddInterceptor(name string, interceptor interceptor.Int
 	return nil
 }
 
-// New returns a new proxy instaceconfigured
+// New returns a new [reverseproxy.ReverseProxy] instace configured.
 //
 // Receives a list of options callback with the configurations to apply.
 func New(options ...func(Configurer) error) (*ReverseProxy, error) {
