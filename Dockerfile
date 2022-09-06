@@ -2,7 +2,6 @@ FROM golang:1.19-alpine3.16 as builder
 
 WORKDIR /reloader
 COPY --chown=root:root ./reloader .
-WORKDIR /reloader/reloader-proxy
 RUN go build
 
 FROM golang:1.19-alpine3.16 as runner
@@ -11,15 +10,14 @@ ENV GOPATH=/go
 ENV APPDIR=/app
 ENV GOSRC=${GOPATH}/src
 ENV PKGSITE_PORT=3000
-ENV PROXY_PORT=8080
-ENV RELOAD_PORT=8081
+ENV PROXY_PORT=80
 
 EXPOSE ${PROXY_PORT}
 
 RUN go install github.com/yosssi/goat@v0.0.0-20190705092005-4e07e5bfb19f
 RUN go install golang.org/x/pkgsite/cmd/pkgsite@v0.0.0-20220825124633-4a62ba3611bc
 
-COPY --from=builder --chown=root:root /reloader/reloader-proxy/reloader-proxy /usr/local/bin/reloader-proxy
+COPY --from=builder --chown=root:root /reloader/reloader /usr/local/bin/reloader
 
 WORKDIR ${APPDIR}
 COPY --chown=root:root ./app/* .

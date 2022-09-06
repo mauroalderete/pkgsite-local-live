@@ -97,7 +97,7 @@ func (c *configurer) Endpoint(url string) error {
 
 	endpoint, err := neturl.Parse(url)
 	if err != nil {
-		return fmt.Errorf("failed to parse origin url: %v", err)
+		return fmt.Errorf("failed to parse endpoint url: %v", err)
 	}
 
 	c.pool = append(c.pool, func(rw *WebsocketServer) error {

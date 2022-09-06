@@ -172,7 +172,7 @@ func New(options ...func(Configurator) error) (*server, error) {
 
 	// prepare a websocket server
 	ws, err := websocketserver.New(func(c websocketserver.Configurator) error {
-		err = c.Endpoint(srv.public.Host)
+		err = c.Endpoint(srv.public.String())
 		if err != nil {
 			return fmt.Errorf("failed to set endpoint to websocket server: %v", err)
 		}
