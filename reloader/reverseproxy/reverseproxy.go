@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
-	neturl "net/url"
+	"net/url"
 
 	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
 )
@@ -15,13 +15,10 @@ import (
 type ReverseProxy struct {
 
 	// origin is the backend endpoint that the proxy query by each request of the client.
-	origin *neturl.URL
+	origin *url.URL
 
 	// endpoint is the frontend endpoint for clients to access.
-	endpoint *neturl.URL
-
-	// upgrade is the backend endpoint to connections of upgrade type incoming.
-	upgrade *neturl.URL
+	endpoint *url.URL
 
 	// proxy is the httputil.ReverseProxy instance that is executed.
 	proxy *httputil.ReverseProxy
@@ -31,36 +28,10 @@ type ReverseProxy struct {
 }
 
 func (rp *ReverseProxy) director(request *http.Request) {
-	log.Printf("[-------------------------------------------]\n")
-	// log.Printf("\treq %v\n", req.ContentLength)
-	// log.Printf("\treq %v\n", req.Header)
-	// log.Printf("\treq %v\n", req.Host)
-	// log.Printf("\treq %v\n", req.Method)
-	// log.Printf("\treq %v\n", req.Proto)
-	// log.Printf("\treq %v\n", req.RemoteAddr)
-	// log.Printf("\treq %v\n", req.RequestURI)
-	// log.Printf("\treq %v\n", req.URL)
-	// log.Printf("\treq %v\n", req.URL.Host)
-	// log.Printf("\treq %v\n", req.URL.Path)
-	// log.Printf("\treq %v\n", req.URL.Scheme)
-	// log.Printf("\treq %v\n", req.URL.User)
-	// log.Printf("\treq %v\n", req.URL.Opaque)
-
-	log.Printf("[director] before %v %v %v\n", request.Host, request.URL.Host, request.URL.Scheme)
-
-	if request.Header.Get("Connection") == "Upgrade" &&
-		request.Header.Get("Upgrade") == "websocket" &&
-		rp.upgrade != nil {
-		redirectTo(request, *rp.upgrade)
-		log.Printf("[director] after by upgrade %v %v %v\n", request.Host, request.URL.Host, request.URL.Scheme)
-		return
-	}
-
 	redirectTo(request, *rp.origin)
-	log.Printf("[director] after by default %v %v %v\n", request.Host, request.URL.Host, request.URL.Scheme)
 }
 
-func redirectTo(request *http.Request, target neturl.URL) {
+func redirectTo(request *http.Request, target url.URL) {
 	request.Host = target.Host
 	request.URL.Host = target.Host
 	request.URL.Scheme = target.Scheme
@@ -70,6 +41,8 @@ func redirectTo(request *http.Request, target neturl.URL) {
 // modify iterates for each interceptor and executes his handler if needed.
 func (rp *ReverseProxy) modify(r *http.Response) error {
 
+	// iterates by each interceptor configured to check if the rules are passed.
+	// In this case, executes the correspondent interceptor.
 	for name, interceptor := range rp.interceptors {
 		accepted := true
 		for _, rule := range interceptor.Rules() {
@@ -93,7 +66,7 @@ func (rp *ReverseProxy) modify(r *http.Response) error {
 	return nil
 }
 
-// Run start to lisent and serve the reverse proxy
+// Run starts to lisent and serve the reverse proxy
 func (rp *ReverseProxy) Run() error {
 	err := http.ListenAndServe(rp.endpoint.Host, rp.proxy)
 	if err != nil {
@@ -102,7 +75,9 @@ func (rp *ReverseProxy) Run() error {
 	return nil
 }
 
-// Run start to lisent and serve the reverse proxy
+// ServeHTTP allows execute a request parse manually
+//
+// Receives the request data that the reverse proxy handle to apply the correspondent redirection.
 func (rp *ReverseProxy) ServeHTTP(response http.ResponseWriter, request *http.Request) error {
 	rp.proxy.ServeHTTP(response, request)
 	return nil
@@ -112,13 +87,10 @@ func (rp *ReverseProxy) ServeHTTP(response http.ResponseWriter, request *http.Re
 type Configurer interface {
 
 	// Origin allows set the endpoint backend url
-	Origin(url string) error
+	Origin(address string) error
 
-	// Endpoint allows set the endpoint frontend url
-	Endpoint(url string) error
-
-	// Upgrade allows set the endpoint to connections upgrade type.
-	Upgrade(url string) error
+	// Public allows set the endpoint frontend url
+	Public(address string) error
 
 	// AddInterceptor allows loading a new interceptor that the proxy must be execute by each request.
 	//
@@ -132,9 +104,9 @@ type configurerPool struct {
 }
 
 // Origin implements proxy.Configurer.Origin method
-func (c *configurerPool) Origin(url string) error {
+func (c *configurerPool) Origin(address string) error {
 
-	addr, err := neturl.Parse(url)
+	addr, err := url.Parse(address)
 	if err != nil {
 		return fmt.Errorf("failed to parse origin url: %v", err)
 	}
@@ -148,31 +120,15 @@ func (c *configurerPool) Origin(url string) error {
 }
 
 // Endpoint implements proxy.Configurer.Endpoint method
-func (c *configurerPool) Endpoint(url string) error {
+func (c *configurerPool) Public(address string) error {
 
-	addr, err := neturl.Parse(url)
+	addr, err := url.Parse(address)
 	if err != nil {
 		return fmt.Errorf("failed to parse endpoint url: %v", err)
 	}
 
 	c.pool = append(c.pool, func(rp *ReverseProxy) error {
 		rp.endpoint = addr
-		return nil
-	})
-
-	return nil
-}
-
-// Upgrade implements proxy.Configurer.Upgrade method
-func (c *configurerPool) Upgrade(url string) error {
-
-	addr, err := neturl.Parse(url)
-	if err != nil {
-		return fmt.Errorf("failed to parse origin url: %v", err)
-	}
-
-	c.pool = append(c.pool, func(rp *ReverseProxy) error {
-		rp.upgrade = addr
 		return nil
 	})
 

@@ -157,7 +157,7 @@ func New(options ...func(Configurator) error) (*server, error) {
 			return fmt.Errorf("failed to set the origin address of the reverse proxy: %v", err)
 		}
 
-		err = c.Endpoint(srv.public.String())
+		err = c.Public(srv.public.String())
 		if err != nil {
 			return fmt.Errorf("failed to set the public address of the reverse proxy: %v", err)
 		}
