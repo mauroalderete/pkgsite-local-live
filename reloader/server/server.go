@@ -1,8 +1,9 @@
+// Package server implements a basic server HTTP to expose routes
+// that allows to handle a reverse proxy and a websocket to manage the livereload feature.
 package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 
@@ -11,6 +12,11 @@ import (
 	"github.com/mauroalderete/pkgsite-local-live/reloader/websocketserver"
 )
 
+// server allow initialize the HTTP server that is manager to replicate the pkgsite endpoint
+// and serve a websocket connection to handle the livereload system.
+//
+// Stores the address to origin and public endpoints.
+// Initialize a instance of reverseproxy.ReverseProxy and websocketserver.WebsocketServer.
 type server struct {
 	origin            *url.URL
 	public            *url.URL
@@ -19,27 +25,23 @@ type server struct {
 	websocket         *websocketserver.WebsocketServer
 }
 
+// Run uploads a new serverMux and launch it.
 func (s *server) Run() error {
 
 	serverMux := http.NewServeMux()
 
 	// handler to accept a new websocket connection
 	serverMux.HandleFunc("/ws", func(response http.ResponseWriter, request *http.Request) {
-		log.Printf("must to upgrade connection")
-
 		s.websocket.WebsocketHandler(response, request)
 	})
 
 	// handler to send broadcast reload signal
 	serverMux.HandleFunc("/ws/reload", func(response http.ResponseWriter, request *http.Request) {
-		log.Printf("must to broadcast reload signal")
-
 		s.websocket.ReloadHandler(response, request)
 	})
 
 	// handler to redirect any connection
 	serverMux.HandleFunc("/", func(response http.ResponseWriter, request *http.Request) {
-		log.Printf("must to redirect")
 		s.proxy.ServeHTTP(response, request)
 	})
 
@@ -51,16 +53,26 @@ func (s *server) Run() error {
 	return nil
 }
 
+// Configurator defines the properties configurables to instance a new Server
 type Configurator interface {
+	// Origin allows set the address to the origin endpoint of the reverse proxy.
 	Origin(address string) error
+
+	// Public allows set the address to is expose the endpoint of the reverse proxy.
 	Public(address string) error
+
+	// ReloadSnippet allows set the path to the file that contains the snippet
+	// that is needed to inject in each request with html content
+	// to the browser can be reloaded when it needed.
 	ReloadSnippet(path string) error
 }
 
+// Implement server.Configurator interface. Stores a pool of configurations callback
 type configure struct {
 	pool []func(*server) error
 }
 
+// Origin implement server.Configurator.Origin method
 func (c *configure) Origin(address string) error {
 	u, err := url.Parse(address)
 	if err != nil {
@@ -75,6 +87,7 @@ func (c *configure) Origin(address string) error {
 	return nil
 }
 
+// Public implement server.Configurator.Public method
 func (c *configure) Public(address string) error {
 
 	u, err := url.Parse(address)
@@ -90,6 +103,7 @@ func (c *configure) Public(address string) error {
 	return nil
 }
 
+// ReloadSnippet implement server.Configurator.ReloadSnippet method
 func (c *configure) ReloadSnippet(path string) error {
 
 	if path == "" {
@@ -104,6 +118,10 @@ func (c *configure) ReloadSnippet(path string) error {
 	return nil
 }
 
+// New instances of a new server object using the properties configured through the callbacks options list.
+//
+// If the options are accepted, loads a new instances of reverseproxy.ReverseProxy,
+// a livereload.Livereload interceptor and a websocketserver.WebsockerServer manager.
 func New(options ...func(Configurator) error) (*server, error) {
 
 	cnf := &configure{}
