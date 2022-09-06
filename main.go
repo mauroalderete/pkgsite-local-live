@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/cmd"
+	"github.com/mauroalderete/pkgsite-local-live/cmd"
 )
 
 func main() {

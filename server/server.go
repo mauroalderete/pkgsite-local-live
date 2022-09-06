@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor/livereload"
-	"github.com/mauroalderete/pkgsite-local-live/reloader/reverseproxy"
-	"github.com/mauroalderete/pkgsite-local-live/reloader/websocketserver"
+	"github.com/mauroalderete/pkgsite-local-live/interceptor/livereload"
+	"github.com/mauroalderete/pkgsite-local-live/reverseproxy"
+	"github.com/mauroalderete/pkgsite-local-live/websocketserver"
 )
 
 // server allow initialize the HTTP server that is manager to replicate the pkgsite endpoint

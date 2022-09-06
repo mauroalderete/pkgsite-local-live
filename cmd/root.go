@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/server"
+	"github.com/mauroalderete/pkgsite-local-live/server"
 	"github.com/spf13/cobra"
 )
 

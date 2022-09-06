@@ -1,4 +1,4 @@
-module github.com/mauroalderete/pkgsite-local-live/reloader
+module github.com/mauroalderete/pkgsite-local-live
 
 go 1.19
 

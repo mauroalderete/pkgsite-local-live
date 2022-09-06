@@ -8,7 +8,7 @@ import (
 	"net/http"
 	neturl "net/url"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/websocketconnections"
+	"github.com/mauroalderete/pkgsite-local-live/websocketconnections"
 )
 
 // WebsocketServer stores a server instance and the connections establishment

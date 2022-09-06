@@ -8,7 +8,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
-	"github.com/mauroalderete/pkgsite-local-live/reloader/interceptor"
+	"github.com/mauroalderete/pkgsite-local-live/interceptor"
 )
 
 // ReverseProxy execute a reverse ReverseProxy and manage the interceptors configured.
