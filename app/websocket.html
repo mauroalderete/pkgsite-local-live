@@ -18,8 +18,12 @@
 					parent.appendChild(elem);
 				}
 			}
-			var protocol = window.location.protocol === 'http:' ? 'ws://' : 'wss://';
-			var address = protocol + 'localhost:9091';
+			var address
+			if (window.location.protocol === 'https:') {
+				address = `wss://${window.location.host}/ws`
+			} else {
+				address = `ws://${window.location.host}/ws`
+			}
 			var socket = new WebSocket(address);
 			socket.onmessage = function (msg) {
 				if (msg.data == 'reload') window.location.reload();

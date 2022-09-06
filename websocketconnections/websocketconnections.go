@@ -1,4 +1,5 @@
-package connections
+// Package connections allows to handle the websocket connection to reload the clients when is needed.
+package websocketconnections
 
 import (
 	"fmt"
@@ -11,6 +12,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Connection models a connection to the client toghether a websocket.
+//
+// It allows upgrade a request recived to initilize a websocket connection. Manage the connection lifecicle.
 type Connection struct {
 	uuid       uuid.UUID
 	response   http.ResponseWriter
@@ -22,10 +26,12 @@ type Connection struct {
 	fail       chan error
 }
 
+// UUID returns the uuid assiged to websocket connection.
 func (c *Connection) UUID() string {
 	return c.uuid.String()
 }
 
+// Open upgrades the connection to establishment a websocket communication.
 func (c *Connection) Open() error {
 	c.ws = websocket.Upgrader{}
 	c.ws.CheckOrigin = func(r *http.Request) bool {
@@ -46,6 +52,7 @@ func (c *Connection) Open() error {
 	return nil
 }
 
+// Start executes the go routines to begin to listen the messages and watch the status connection.
 func (c *Connection) Start() error {
 
 	c.stop = make(chan bool)
@@ -71,6 +78,7 @@ func (c *Connection) Start() error {
 	}
 }
 
+// Reload enables the sending of the reload message to the client.
 func (c *Connection) Reload() error {
 	if c.reload == nil {
 		return fmt.Errorf("(%s) failed to reload, so the connection is not started", c.UUID())
@@ -79,6 +87,7 @@ func (c *Connection) Reload() error {
 	return nil
 }
 
+// Stop terminates with the watching and listening of the connection.
 func (c *Connection) Stop() error {
 	if c.stop == nil {
 		return fmt.Errorf("(%s) failed to stop, so the connection is not started", c.UUID())
@@ -88,6 +97,7 @@ func (c *Connection) Stop() error {
 	return nil
 }
 
+// Close disconnects and closes the websocket connection.
 func (c *Connection) Close() error {
 	err := c.connection.Close()
 	if err != nil {
@@ -96,6 +106,9 @@ func (c *Connection) Close() error {
 	return nil
 }
 
+// alive waits to recive any message allows us know if the connection is lossed or maintain alive.
+//
+// When an error is detected, it sends a stop signal to terminate with the watching and listening of the connection.
 func (c *Connection) alive() {
 	for {
 		_, _, err := c.connection.ReadMessage()
@@ -105,6 +118,7 @@ func (c *Connection) alive() {
 	}
 }
 
+// watch sends the reload signal as text message to the client when it needed.
 func (c *Connection) watch() {
 	for {
 		select {
@@ -125,15 +139,21 @@ func (c *Connection) watch() {
 	}
 }
 
+// Configurer defines the configurable options to build a new Connection instance.
 type Configurer interface {
+	// ResponseWriter allows set the request response received by the client.
 	ResponseWriter(response http.ResponseWriter) error
+
+	// Request allows set the request instance received by the client.
 	Request(request *http.Request) error
 }
 
+// configurerPool implements [websocketconnections.Configurer] interface.
 type configurerPool struct {
 	pool []func(c *Connection) error
 }
 
+// ResponseWriter implements [http.ResponseWriter] method.
 func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -144,6 +164,7 @@ func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 	return nil
 }
 
+// Request implements [http.Request] method.
 func (cp *configurerPool) Request(request *http.Request) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -154,6 +175,7 @@ func (cp *configurerPool) Request(request *http.Request) error {
 	return nil
 }
 
+// New returns a [websocketconnections.Connection] instance with request and response instanced configured.
 func New(options ...func(Configurer) error) (*Connection, error) {
 
 	configuration := &configurerPool{}
