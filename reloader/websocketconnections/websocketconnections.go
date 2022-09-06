@@ -26,10 +26,12 @@ type Connection struct {
 	fail       chan error
 }
 
+// UUID returns the uuid assiged to websocket connection.
 func (c *Connection) UUID() string {
 	return c.uuid.String()
 }
 
+// Open upgrades the connection to establishment a websocket communication.
 func (c *Connection) Open() error {
 	c.ws = websocket.Upgrader{}
 	c.ws.CheckOrigin = func(r *http.Request) bool {
@@ -50,6 +52,7 @@ func (c *Connection) Open() error {
 	return nil
 }
 
+// Start execute the go routines to begin to listen the messages and watch the status connection.
 func (c *Connection) Start() error {
 
 	c.stop = make(chan bool)
@@ -75,6 +78,7 @@ func (c *Connection) Start() error {
 	}
 }
 
+// Reload enables the sending of the reload message to the client.
 func (c *Connection) Reload() error {
 	if c.reload == nil {
 		return fmt.Errorf("(%s) failed to reload, so the connection is not started", c.UUID())
@@ -83,6 +87,7 @@ func (c *Connection) Reload() error {
 	return nil
 }
 
+// Stop terminates with the watching and listening of the connection.
 func (c *Connection) Stop() error {
 	if c.stop == nil {
 		return fmt.Errorf("(%s) failed to stop, so the connection is not started", c.UUID())
@@ -92,6 +97,7 @@ func (c *Connection) Stop() error {
 	return nil
 }
 
+// Close disconnects and closes the websocket connection.
 func (c *Connection) Close() error {
 	err := c.connection.Close()
 	if err != nil {
@@ -100,6 +106,9 @@ func (c *Connection) Close() error {
 	return nil
 }
 
+// alive waits to recive any message allows us know if the connection is lossed or maintain alive.
+//
+// When an error is detected, it sends a stop signal to terminate with the watching and listening of the connection.
 func (c *Connection) alive() {
 	for {
 		_, _, err := c.connection.ReadMessage()
@@ -109,6 +118,7 @@ func (c *Connection) alive() {
 	}
 }
 
+// watch sends the reload signal as text message to the client when it needed.
 func (c *Connection) watch() {
 	for {
 		select {
