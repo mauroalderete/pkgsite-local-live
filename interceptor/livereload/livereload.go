@@ -15,11 +15,16 @@ import (
 	"strings"
 )
 
+type OpenFile func(name string) (*os.File, error)
+type ReadAll func(r io.Reader) ([]byte, error)
+
 // Livereload implements [interceptor.Interceptor] interface
 type Livereload struct {
 	webserviceInjectable string
 	rules                []interceptor.InterceptorRuler
 	upgradeEndpoint      string
+	openFile             OpenFile
+	readAll              ReadAll
 }
 
 // Rules implements [interceptor.Interceptor.Rules] method.
@@ -129,6 +134,10 @@ type Configurer interface {
 	// UpgradeEndpoint set the reload microservice endpoint that the snippet must be listened
 	// to establish the connection with a WebSocket.
 	UpgradeEndpoint(url string) error
+
+	OpenFile(openFile OpenFile) error
+
+	ReadAll(readAll ReadAll) error
 }
 
 // configurer implement the [livereload.Configurer] interface.
@@ -148,11 +157,11 @@ func (c *configurer) WebserviceInjectable(path string) error {
 	}
 
 	c.pool = append(c.pool, func(l *Livereload) error {
-		file, err := os.Open(path)
+		file, err := l.openFile(path)
 		if err != nil {
 			return fmt.Errorf("failed load webservice injectable resource from %s: %v", path, err)
 		}
-		content, err := io.ReadAll(file)
+		content, err := l.readAll(file)
 		if err != nil {
 			return fmt.Errorf("failed to access at the content of webservice injectable resource: %v", err)
 		}
@@ -172,6 +181,34 @@ func (c *configurer) UpgradeEndpoint(url string) error {
 
 	c.pool = append(c.pool, func(l *Livereload) error {
 		l.upgradeEndpoint = url
+		return nil
+	})
+
+	return nil
+}
+
+func (c *configurer) OpenFile(openFile OpenFile) error {
+
+	if openFile == nil {
+		return fmt.Errorf("open file action cannot be empty")
+	}
+
+	c.pool = append(c.pool, func(l *Livereload) error {
+		l.openFile = openFile
+		return nil
+	})
+
+	return nil
+}
+
+func (c *configurer) ReadAll(readAll ReadAll) error {
+
+	if readAll == nil {
+		return fmt.Errorf("open file action cannot be empty")
+	}
+
+	c.pool = append(c.pool, func(l *Livereload) error {
+		l.readAll = readAll
 		return nil
 	})
 
@@ -200,13 +237,15 @@ func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to load the configuration: %v", err)
 		}
-	}
 
-	for _, config := range configurer.pool {
-		err := config(livereload)
-		if err != nil {
-			return nil, fmt.Errorf("failed to apply the configuration: %v", err)
+		for _, config := range configurer.pool {
+			err := config(livereload)
+			if err != nil {
+				return nil, fmt.Errorf("failed to apply the configuration: %v", err)
+			}
 		}
+
+		configurer.pool = configurer.pool[:0]
 	}
 
 	if len(livereload.webserviceInjectable) == 0 {
@@ -215,6 +254,14 @@ func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 
 	if len(livereload.upgradeEndpoint) == 0 {
 		return nil, fmt.Errorf("a reload endpoint is required")
+	}
+
+	if livereload.openFile == nil {
+		return nil, fmt.Errorf("a openFile action is required")
+	}
+
+	if livereload.readAll == nil {
+		return nil, fmt.Errorf("a readAll action is required")
 	}
 
 	return livereload, nil
