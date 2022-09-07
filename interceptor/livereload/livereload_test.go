@@ -7,6 +7,50 @@ import (
 	"testing"
 )
 
+func TestConfigureOpenFileNil(t *testing.T) {
+	config := &configurer{}
+
+	err := config.OpenFile(nil)
+	if err == nil {
+		t.Errorf("want an error, got nil")
+	}
+}
+
+func TestConfigureReadAllNil(t *testing.T) {
+	config := &configurer{}
+
+	err := config.ReadAll(nil)
+	if err == nil {
+		t.Errorf("want an error, got nil")
+	}
+}
+
+func TestConfigureUpgradeEndpointEmpty(t *testing.T) {
+	config := &configurer{}
+
+	err := config.UpgradeEndpoint("")
+	if err == nil {
+		t.Errorf("want an error, got nil")
+	}
+}
+
+func TestConfigureUpgradeEndpoint(t *testing.T) {
+
+	livereloadMock := &Livereload{}
+	config := &configurer{}
+
+	err := config.UpgradeEndpoint("some address")
+	if err != nil {
+		t.Errorf("want error nil, got '%s'", err)
+	}
+
+	err = config.pool[0](livereloadMock)
+	if err != nil {
+		t.Errorf("want error nil, got '%s'", err)
+		return
+	}
+}
+
 func TestWebserviceInjectableEmpty(t *testing.T) {
 	conf := &configurer{}
 
