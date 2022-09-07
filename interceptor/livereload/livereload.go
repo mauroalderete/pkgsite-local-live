@@ -246,6 +246,14 @@ func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 		}
 
 		configurer.pool = configurer.pool[:0]
+
+		if livereload.openFile == nil {
+			return nil, fmt.Errorf("a openFile action is required")
+		}
+
+		if livereload.readAll == nil {
+			return nil, fmt.Errorf("a readAll action is required")
+		}
 	}
 
 	if len(livereload.webserviceInjectable) == 0 {
@@ -254,14 +262,6 @@ func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 
 	if len(livereload.upgradeEndpoint) == 0 {
 		return nil, fmt.Errorf("a reload endpoint is required")
-	}
-
-	if livereload.openFile == nil {
-		return nil, fmt.Errorf("a openFile action is required")
-	}
-
-	if livereload.readAll == nil {
-		return nil, fmt.Errorf("a readAll action is required")
 	}
 
 	return livereload, nil

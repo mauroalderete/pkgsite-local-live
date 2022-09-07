@@ -220,3 +220,195 @@ func TestWebserviceInjectableSuccefful(t *testing.T) {
 		return
 	}
 }
+
+func TestRules(t *testing.T) {
+	livereload, err := New(
+		func(c Configurer) error {
+			c.OpenFile(func(name string) (*os.File, error) {
+				return &os.File{}, nil
+			})
+
+			c.ReadAll(func(r io.Reader) ([]byte, error) {
+				return []byte("some content"), nil
+			})
+			return nil
+		},
+		func(c Configurer) error {
+			err := c.UpgradeEndpoint("address")
+			if err != nil {
+				return err
+			}
+
+			err = c.WebserviceInjectable("some pathfile")
+			if err != nil {
+				return err
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		t.Errorf("failed to instance livereload mock, got '%v'", err)
+		return
+	}
+
+	expected := 3
+	got := len(livereload.Rules())
+	if expected != got {
+		t.Errorf("expected %d rules, got %d", expected, got)
+		return
+	}
+}
+
+func TestNew(t *testing.T) {
+
+	t.Run("without openFile", func(t *testing.T) {
+		_, err := New(
+			func(c Configurer) error {
+				c.ReadAll(func(r io.Reader) ([]byte, error) {
+					return []byte("some content"), nil
+				})
+				return nil
+			},
+			func(c Configurer) error {
+				err := c.UpgradeEndpoint("address")
+				if err != nil {
+					return err
+				}
+
+				err = c.WebserviceInjectable("some pathfile")
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+		)
+		if err == nil {
+			t.Errorf("want an error, got nil")
+			return
+		}
+	})
+
+	t.Run("without readAll", func(t *testing.T) {
+		_, err := New(
+			func(c Configurer) error {
+				c.OpenFile(func(name string) (*os.File, error) {
+					return &os.File{}, nil
+				})
+				return nil
+			},
+			func(c Configurer) error {
+				err := c.UpgradeEndpoint("address")
+				if err != nil {
+					return err
+				}
+
+				err = c.WebserviceInjectable("some pathfile")
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+		)
+		if err == nil {
+			t.Errorf("want an error, got nil")
+			return
+		}
+	})
+
+	t.Run("without webserviceInjectable", func(t *testing.T) {
+		_, err := New(
+			func(c Configurer) error {
+				c.OpenFile(func(name string) (*os.File, error) {
+					return &os.File{}, nil
+				})
+
+				c.ReadAll(func(r io.Reader) ([]byte, error) {
+					return []byte("some content"), nil
+				})
+				return nil
+			},
+			func(c Configurer) error {
+				err := c.UpgradeEndpoint("address")
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+		)
+		if err == nil {
+			t.Errorf("want an error, got nil")
+			return
+		}
+	})
+
+	t.Run("without endpoint", func(t *testing.T) {
+		_, err := New(
+			func(c Configurer) error {
+				c.OpenFile(func(name string) (*os.File, error) {
+					return &os.File{}, nil
+				})
+
+				c.ReadAll(func(r io.Reader) ([]byte, error) {
+					return []byte("some content"), nil
+				})
+				return nil
+			},
+			func(c Configurer) error {
+				err := c.WebserviceInjectable("some pathfile")
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+		)
+		if err == nil {
+			t.Errorf("want an error, got nil")
+			return
+		}
+	})
+
+	t.Run("fail prepare some config", func(t *testing.T) {
+		_, err := New(
+			func(c Configurer) error {
+				return fmt.Errorf("some was wrong")
+			},
+		)
+		if err == nil {
+			t.Errorf("want an error, got nil")
+			return
+		}
+	})
+
+	t.Run("fail apply some config", func(t *testing.T) {
+		_, err := New(
+			func(c Configurer) error {
+				c.OpenFile(func(name string) (*os.File, error) {
+					return &os.File{}, fmt.Errorf("some was wrong")
+				})
+
+				c.ReadAll(func(r io.Reader) ([]byte, error) {
+					return []byte("some content"), nil
+				})
+				return nil
+			},
+			func(c Configurer) error {
+				err := c.WebserviceInjectable("some pathfile")
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+		)
+		if err == nil {
+			t.Errorf("want an error, got nil")
+			return
+		}
+	})
+
+}
