@@ -3,7 +3,9 @@ package livereload
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -73,7 +75,6 @@ func TestWebserviceInjectableWrongPath(t *testing.T) {
 	conf := &configurer{}
 
 	conf.OpenFile(func(name string) (*os.File, error) {
-		fmt.Printf("asdasd")
 		return nil, fmt.Errorf("file not found")
 	})
 
@@ -410,5 +411,129 @@ func TestNew(t *testing.T) {
 			return
 		}
 	})
+}
 
+func TestStatusCodeRule(t *testing.T) {
+	cases := map[string]struct {
+		response *http.Response
+		expected bool
+	}{
+		"200": {&http.Response{StatusCode: 200}, true},
+		"304": {&http.Response{StatusCode: 304}, true},
+		"404": {&http.Response{StatusCode: 404}, false},
+		"501": {&http.Response{StatusCode: 501}, false},
+	}
+
+	for n, c := range cases {
+		t.Run(n, func(t *testing.T) {
+			if statusCodeRule(c.response) != c.expected {
+				t.Errorf("expected %v, got %v", c.expected, !c.expected)
+				return
+			}
+		})
+	}
+}
+
+func TestContentTypeRule(t *testing.T) {
+	cases := map[string]struct {
+		response *http.Response
+		expected bool
+	}{
+		"html":    {&http.Response{Header: map[string][]string{"Content-Type": {"text/html"}}}, true},
+		"json":    {&http.Response{Header: map[string][]string{"Content-Type": {"text/json"}}}, false},
+		"image":   {&http.Response{Header: map[string][]string{"Content-Type": {"image/*"}}}, false},
+		"unknown": {&http.Response{Header: map[string][]string{"Content-Type": {"some other"}}}, false},
+		"without": {&http.Response{}, true},
+	}
+
+	for n, c := range cases {
+		t.Run(n, func(t *testing.T) {
+			if contentTypeRule(c.response) != c.expected {
+				t.Errorf("expected %v, got %v", c.expected, !c.expected)
+				return
+			}
+		})
+	}
+}
+
+type nopCloserMock struct {
+	io.Reader
+	close func() error
+}
+
+func (ncm *nopCloserMock) Close() error { return ncm.close() }
+
+func TestHasOneBodyTagRule(t *testing.T) {
+	cases := map[string]struct {
+		response *http.Response
+		reader   func(r io.Reader) ([]byte, error)
+		expected bool
+	}{
+		"empty":              {&http.Response{Body: io.NopCloser(strings.NewReader(""))}, func(r io.Reader) ([]byte, error) { return io.ReadAll(r) }, false},
+		"only open tag":      {&http.Response{Body: io.NopCloser(strings.NewReader("abc<body>abc"))}, func(r io.Reader) ([]byte, error) { return io.ReadAll(r) }, false},
+		"only close tag":     {&http.Response{Body: io.NopCloser(strings.NewReader("abc</body>abc"))}, func(r io.Reader) ([]byte, error) { return io.ReadAll(r) }, false},
+		"two open one close": {&http.Response{Body: io.NopCloser(strings.NewReader("abc<body>abc<body>abc</body>abc"))}, func(r io.Reader) ([]byte, error) { return io.ReadAll(r) }, false},
+		"one open two close": {&http.Response{Body: io.NopCloser(strings.NewReader("abc<body>abc</body>abc</body>abc"))}, func(r io.Reader) ([]byte, error) { return io.ReadAll(r) }, false},
+		"reader failed":      {&http.Response{Body: io.NopCloser(strings.NewReader(""))}, func(r io.Reader) ([]byte, error) { return nil, fmt.Errorf("some was wrong") }, false},
+		"close filed":        {&http.Response{Body: &nopCloserMock{strings.NewReader(""), func() error { return fmt.Errorf("some was wrong") }}}, func(r io.Reader) ([]byte, error) { return io.ReadAll(r) }, false},
+		"succefull":          {&http.Response{Body: io.NopCloser(strings.NewReader("abc<body>abc</body>abc"))}, func(r io.Reader) ([]byte, error) { return io.ReadAll(r) }, true},
+	}
+
+	for n, c := range cases {
+		t.Run(n, func(t *testing.T) {
+			if hasOneBodyTagRule(c.response, c.reader) != c.expected {
+				t.Errorf("expected %v, got %v", c.expected, !c.expected)
+				return
+			}
+		})
+	}
+}
+
+func TestInterceptor(t *testing.T) {
+	livereload := &Livereload{}
+
+	livereload.webserviceInjectable = "1234567890"
+	livereload.readAll = io.ReadAll
+
+	response := &http.Response{}
+	response.Body = io.NopCloser(strings.NewReader("abc<body>abc</body>abc"))
+	response.Header = make(http.Header)
+
+	interceptorCallback := livereload.Handler()
+	err := interceptorCallback(response)
+	if err != nil {
+		t.Errorf("failed to try execute the handler: %v", err)
+		return
+	}
+
+	result, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("failed to try read response modified: %v", err)
+		return
+	}
+
+	expected := fmt.Sprintf("abc<body>abc\n%s\n</body>abc", livereload.webserviceInjectable)
+
+	if string(result) != expected {
+		t.Errorf("expected '%s', got '%s'", expected, string(result))
+		return
+	}
+}
+
+func TestInterceptorError(t *testing.T) {
+	livereload := &Livereload{}
+
+	livereload.webserviceInjectable = "1234567890"
+	livereload.readAll = func(r io.Reader) ([]byte, error) { return []byte{}, fmt.Errorf("some was wrong") }
+
+	response := &http.Response{}
+	response.Body = io.NopCloser(strings.NewReader("abc<body>abc</body>abc"))
+	response.Header = make(http.Header)
+
+	interceptorCallback := livereload.Handler()
+	err := interceptorCallback(response)
+	if err == nil {
+		t.Errorf("excpected an error, but error is nil")
+		return
+	}
 }

@@ -41,7 +41,7 @@ func (l *Livereload) Rules() []interceptor.InterceptorRuler {
 // the snippet passed as option during the build of a instance of [liverreload.livereload].
 func (l *Livereload) Handler() interceptor.InterceptorHandler {
 	return func(r *http.Response) error {
-		content, err := getBody(r)
+		content, err := getBody(r, l.readAll)
 		if err != nil {
 			return fmt.Errorf("failed to get body: %v", err)
 		}
@@ -49,7 +49,7 @@ func (l *Livereload) Handler() interceptor.InterceptorHandler {
 		exp := regexp.MustCompile("</body>")
 		location := exp.FindIndex([]byte(content))
 
-		contentModified := content[:location[0]-1]
+		contentModified := content[:location[0]]
 		contentModified += fmt.Sprintf("\n%s\n", l.webserviceInjectable)
 		contentModified += content[location[0]:]
 
@@ -91,8 +91,8 @@ func contentTypeRule(r *http.Response) bool {
 }
 
 // hasOneBodyTagRule validates that the response requested has only one body HTML tag pair.
-func hasOneBodyTagRule(r *http.Response) bool {
-	content, err := getBody(r)
+func hasOneBodyTagRule(r *http.Response, Reader ReadAll) bool {
+	content, err := getBody(r, Reader)
 	if err != nil {
 		return false
 	}
@@ -109,8 +109,8 @@ func hasOneBodyTagRule(r *http.Response) bool {
 
 // getBody allows access to a copy of the body content
 // while maintaining open the body in response requested to future readings.
-func getBody(r *http.Response) (string, error) {
-	body, err := io.ReadAll(r.Body)
+func getBody(r *http.Response, Reader ReadAll) (string, error) {
+	body, err := Reader(r.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read the body: %v", err)
 	}
@@ -222,11 +222,13 @@ func (c *configurer) ReadAll(readAll ReadAll) error {
 // and configures the rules needed to identify the request that must be injected.
 func New(options ...func(Configurer) error) (interceptor.Interceptor, error) {
 
-	livereload := &Livereload{
-		rules: []interceptor.InterceptorRuler{
-			statusCodeRule,
-			contentTypeRule,
-			hasOneBodyTagRule,
+	livereload := &Livereload{}
+
+	livereload.rules = []interceptor.InterceptorRuler{
+		statusCodeRule,
+		contentTypeRule,
+		func(r *http.Response) bool {
+			return hasOneBodyTagRule(r, livereload.readAll)
 		},
 	}
 
