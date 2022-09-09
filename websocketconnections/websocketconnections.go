@@ -33,20 +33,12 @@ func (c *Connection) UUID() string {
 
 // Open upgrades the connection to establishment a websocket communication.
 func (c *Connection) Open() error {
-	c.ws = websocket.Upgrader{}
-	c.ws.CheckOrigin = func(r *http.Request) bool {
-		origin := r.Header.Values("Origin")
-		if len(origin) != 1 {
-			return false
-		}
-
-		return strings.HasPrefix(origin[0], "http://localhost")
-	}
 
 	connection, err := c.ws.Upgrade(c.response, c.request, nil)
 	if err != nil {
 		return fmt.Errorf("(%s) failed to upgrade the connection", c.UUID())
 	}
+
 	c.connection = connection
 
 	return nil
@@ -153,7 +145,7 @@ type configurerPool struct {
 	pool []func(c *Connection) error
 }
 
-// ResponseWriter implements [http.ResponseWriter] method.
+// ResponseWriter implements [Configurer.ResponseWriter] method.
 func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -164,7 +156,7 @@ func (cp *configurerPool) ResponseWriter(response http.ResponseWriter) error {
 	return nil
 }
 
-// Request implements [http.Request] method.
+// Request implements [Configurer.Request] method.
 func (cp *configurerPool) Request(request *http.Request) error {
 
 	cp.pool = append(cp.pool, func(c *Connection) error {
@@ -181,6 +173,17 @@ func New(options ...func(Configurer) error) (*Connection, error) {
 	configuration := &configurerPool{}
 	conn := &Connection{
 		uuid: uuid.New(),
+	}
+
+	conn.ws = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Values("Origin")
+			if len(origin) != 1 {
+				return false
+			}
+
+			return strings.HasPrefix(origin[0], "http://localhost")
+		},
 	}
 
 	for _, option := range options {
