@@ -23,6 +23,7 @@ COPY --from=builder --chown=root:root ${GOPATH}/src/reloader/reloader /usr/local
 
 WORKDIR ${APPDIR}
 COPY --chown=root:root ./app/* .
+RUN chmod +x *.sh
 RUN ln start.sh /usr/local/bin/start
 RUN ln startservice.sh /usr/local/bin/startservice
 RUN ln stopservice.sh /usr/local/bin/stopservice

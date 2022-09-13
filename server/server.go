@@ -4,8 +4,10 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 
 	"github.com/mauroalderete/pkgsite-local-live/interceptor/livereload"
 	"github.com/mauroalderete/pkgsite-local-live/reverseproxy"
@@ -162,18 +164,34 @@ func New(options ...func(Configurator) error) (*server, error) {
 			return fmt.Errorf("failed to set the public address of the reverse proxy: %v", err)
 		}
 
-		livereload, err := livereload.New(func(c livereload.Configurer) error {
-			err := c.UpgradeEndpoint(srv.public.String() + "/ws")
-			if err != nil {
-				return fmt.Errorf("failed to set the upgrade endpoint to livereload interceptor: %v", err)
-			}
+		livereload, err := livereload.New(
+			// injects dependencies
+			func(c livereload.Configurer) error {
+				err := c.OpenFile(os.Open)
+				if err != nil {
+					return fmt.Errorf("failed to inject the open file dependency: %v", err)
+				}
 
-			err = c.WebserviceInjectable(srv.reloadSnippetPath)
-			if err != nil {
-				return fmt.Errorf("failed to set the reload snippet path to livereload interceptor: %v", err)
-			}
-			return nil
-		})
+				err = c.ReadAll(io.ReadAll)
+				if err != nil {
+					return fmt.Errorf("failed to inject the read all dependency: %v", err)
+				}
+
+				return nil
+			},
+			// configures the instance
+			func(c livereload.Configurer) error {
+				err := c.UpgradeEndpoint(srv.public.String() + "/ws")
+				if err != nil {
+					return fmt.Errorf("failed to set the upgrade endpoint to livereload interceptor: %v", err)
+				}
+
+				err = c.WebserviceInjectable(srv.reloadSnippetPath)
+				if err != nil {
+					return fmt.Errorf("failed to set the reload snippet path to livereload interceptor: %v", err)
+				}
+				return nil
+			})
 		if err != nil {
 			return fmt.Errorf("failed to set livereload interceptor of the reverse proxy: %v", err)
 		}
