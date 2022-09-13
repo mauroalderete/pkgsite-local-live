@@ -28,13 +28,9 @@ type ReverseProxy struct {
 }
 
 func (rp *ReverseProxy) director(request *http.Request) {
-	redirectTo(request, *rp.origin)
-}
-
-func redirectTo(request *http.Request, target url.URL) {
-	request.Host = target.Host
-	request.URL.Host = target.Host
-	request.URL.Scheme = target.Scheme
+	request.Host = rp.origin.Host
+	request.URL.Host = rp.origin.Host
+	request.URL.Scheme = rp.origin.Scheme
 	request.RequestURI = ""
 }
 
@@ -66,6 +62,8 @@ func (rp *ReverseProxy) modify(r *http.Response) error {
 	return nil
 }
 
+// coverage:ignore-start
+
 // Run starts to lisent and serve the reverse proxy
 func (rp *ReverseProxy) Run() error {
 	err := http.ListenAndServe(rp.endpoint.Host, rp.proxy)
@@ -82,6 +80,8 @@ func (rp *ReverseProxy) ServeHTTP(response http.ResponseWriter, request *http.Re
 	rp.proxy.ServeHTTP(response, request)
 	return nil
 }
+
+// coverage:ignore-end
 
 // Configurer defines the available options to configure a new instance of [reverseproxy.ReverseProxy].
 type Configurer interface {
