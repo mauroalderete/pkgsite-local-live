@@ -40,22 +40,24 @@
   - [Examples](#examples)
 - [:rocket: Upcomming Features](#rocket-upcomming-features)
 - [:hammer: How to Set up `pkgsite-local-live` for Development?](#hammer-how-to-set-up-pkgsite-local-live-for-development)
-  - [Build](#build)
-- [:hamburger: Built With](#hamburger-built-with)
+  - [Test reloader service](#test-reloader-service)
+  - [Build image](#build-image)
 - [:handshake: Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live)
 - [:pray: Support](#pray-support)
 
 &nbsp;
 # :wave: Introducing `pkgsite-local-live`
-`pkgsite-local-live` is a docker image that maintains a pkgsite instance up with all go modules stored in a folder loaded. A watcher looks at any change in the go files to know when to restart the pkgsite instance and back reload your browser view.
+`pkgsite-local-live` is a docker image that maintains a pkgsite instance up with all go modules stored in the folder `$GOPATH/src` of the container. A watcher looks at any change in the go files to know when to restart the pkgsite instance and back reload all open browser views.
 
-With `pkgsite-local-live` you can query the documentation from the local projects stored in your personal workspace, at the same time that you can view the changes that occur while you working on them in real-time.
+Binding your local `$GOPATH/src` you can use `pkgsite-local-live` to query the documentation from the local projects stored in your personal workspace, at the same time you can view the changes that occur while you are working on them in real-time.
 
-For the moment, this project is in an early development phase, so all versions are unstable.
-
-You can take a look at the [upcoming features](#rocket-upcomming-features) to know more about the `pkgsite-local-live` future.
-
-Hey! don't be discouraged, you can help me to carry out this project in many ways, contributing with new features, reporting bugs, sharing in your social networks or supporting with a :star:
+```mermaid
+  graph TD;
+      A-->B;
+      A-->C;
+      B-->D;
+      C-->D;
+```
 
 Please, look at [Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live) to choose the way to collaborate with you feel better.
 
@@ -64,16 +66,16 @@ Please, look at [Contributing to `pkgsite-local-live`](#handshake-contributing-t
 ## Run
 
 ```bash
-docker run -v <GO WORKSPACE>:/go/src -p <PORT>:3000 mauroalderete/pkgsite-local-live:latest
+docker run -v $GOPATH/src:/go/src -p 8080:80 mauroalderete/pkgsite-local-live:latest
 ```
 
 ## Ports
 
-Exposes the port 3000 to access to pkgsite instance with all modules loaded.
+Exposes the port 80 to access to pkgsite instance with all modules loaded.
 
 ## Volumes
 
-`pkgsite-local-live` searches the modules in `/go/src` path. You must provide a source that will contain the go modules.
+`pkgsite-local-live` searches the modules in `/go/src` path. You must provide a source that will contains the go modules.
 
 If the volume source doesn't have any go module, the pkgsite instance will end with an error and you cannot see anything through the port. This state will maintain this way to a 'go.mod' file will be found.
 
@@ -93,7 +95,7 @@ It is expected that the source volume contains many go modules, each one in its 
 ## Examples
 
 ```bash
-docker run -v $GOPATH/src:/go/src -p 8080:3000 mauroalderete/pkgsite-local-live:latest
+docker run -v $GOPATH/src:/go/src -p 8080:80 mauroalderete/pkgsite-local-live:latest
 ```
 
 Configures a container to load in pkgsite instance all modules stored in the golang standard workspace. Binds the port 8080 to access to pkgsite website.
@@ -102,8 +104,8 @@ Configures a container to load in pkgsite instance all modules stored in the gol
 
 `pkgsite-local-live` has all the potential to grow further. Here are some of the upcoming features planned (not in any order),
 
-- ✔️ Liverelaod. Any change in your go files will show updating in your browser.
-- ✔️ Auto-scan modules. Only you will need to configure a volume with your workspace and all go modules will be loaded.
+- ✔️ Filter modules to load. You will can filter the modules that you want to load by pkgsite instance using a yaml file configure.
+- ✔️ Index. You will can enable a index in the home page to view all modules loaded and visit to speedly.
 
 # :hammer: How to Set up `pkgsite-local-live` for Development?
 
@@ -116,16 +118,16 @@ git clone https://github.com/mauroalderete/pkgsite-local-live
 cd pkgsite-local-live
 ```
 
-## Build
+## Test reloader service
+
+```bash
+got=go test -v ./... -coverprofile=coverage.out -covermode=count && go tool cover -html=coverage.out
+```
+## Build image
 
 ```bash
 docker build -t <username>/pkgsite-local-live:<tag> .
 ```
-
-# :hamburger: Built With
-
-- [Docker](https://www.docker.com/) 20.10.17
-
 # :handshake: Contributing to `pkgsite-local-live`
 
 Any kind of positive contribution is welcome! Please help us to grow by contributing to the project.
