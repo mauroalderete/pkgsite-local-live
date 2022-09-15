@@ -52,11 +52,36 @@
 Binding your local `$GOPATH/src` you can use `pkgsite-local-live` to query the documentation from the local projects stored in your personal workspace, at the same time you can view the changes that occur while you are working on them in real-time.
 
 ```mermaid
-  graph TD;
-      A-->B;
-      A-->C;
-      B-->D;
-      C-->D;
+graph TB
+    subgraph local[Local workspace]
+        direction TB
+        workspace[fa:fa-folder Workspace]
+        developer[fa:fa-user Go developer]
+        browser[fa:fa-eye Browser]
+
+        developer --->|Edits source files| workspace
+        browser --->|Shows last changes<br>on documentation| developer
+    end
+
+    subgraph container[Pkgsite Local Live]
+        direction LR
+        subgraph volumes[Volumes]
+            modules[Go modules]
+        end
+        subgraph services[Services]
+            watcher[Watcher service]
+            reloader[Reloader server]
+            pkgsite[Pkgsite server]
+        end
+    end
+
+    workspace -->|Volume binding| modules
+    modules -->|Listens for any change<br>on go files| watcher
+    modules -->|Loads once at the start<br>the documentation<br>from golang source files| pkgsite
+    watcher -->|Restarts the pkgsite instance<br>to reload the last changes<br>on documentation| pkgsite
+    watcher -->|Emits a request<br>to handle a reload event| reloader
+    pkgsite -->|Gets documentation pages| reloader
+    reloader -->|Serves documentation pages<br>with a live-reload system injected| browser
 ```
 
 Please, look at [Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live) to choose the way to collaborate with you feel better.
