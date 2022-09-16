@@ -32,57 +32,26 @@
 &nbsp;
 
 # Content <!-- omit in toc -->
-- [:wave: Introducing `pkgsite-local-live`](#wave-introducing-pkgsite-local-live)
-- [:clamp: Use](#clamp-use)
+- [Introducing `pkgsite-local-live`](#introducing-pkgsite-local-live)
+- [Use](#use)
   - [Run](#run)
   - [Ports](#ports)
   - [Volumes](#volumes)
   - [Examples](#examples)
-- [:rocket: Upcomming Features](#rocket-upcomming-features)
-- [:hammer: How to Set up `pkgsite-local-live` for Development?](#hammer-how-to-set-up-pkgsite-local-live-for-development)
+- [Upcomming Features](#upcomming-features)
+- [How to Set up `pkgsite-local-live` for Development?](#how-to-set-up-pkgsite-local-live-for-development)
   - [Test reloader service](#test-reloader-service)
   - [Build image](#build-image)
-- [:handshake: Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live)
-- [:pray: Support](#pray-support)
+- [Contributing to `pkgsite-local-live`](#contributing-to-pkgsite-local-live)
+- [Support](#support)
 
 &nbsp;
-# :wave: Introducing `pkgsite-local-live`
+# Introducing `pkgsite-local-live`
 `pkgsite-local-live` is a docker image that maintains a pkgsite instance up with all go modules stored in the folder `$GOPATH/src` of the container. A watcher looks at any change in the go files to know when to restart the pkgsite instance and back reload all open browser views.
 
 Binding your local `$GOPATH/src` you can use `pkgsite-local-live` to query the documentation from the local projects stored in your personal workspace, at the same time you can view the changes that occur while you are working on them in real-time.
 
-```mermaid
-graph TB
-    subgraph local[Local workspace]
-        direction TB
-        workspace[fa:fa-folder Workspace]
-        developer[fa:fa-user Go developer]
-        browser[fa:fa-eye Browser]
-
-        developer --->|Edits source files| workspace
-        browser --->|Shows last changes<br>on documentation| developer
-    end
-
-    subgraph container[Pkgsite Local Live]
-        direction LR
-        subgraph volumes[Volumes]
-            modules[Go modules]
-        end
-        subgraph services[Services]
-            watcher[Watcher service]
-            reloader[Reloader server]
-            pkgsite[Pkgsite server]
-        end
-    end
-
-    workspace -->|Volume binding| modules
-    modules -->|Listens for any change<br>on go files| watcher
-    modules -->|Loads once at the start<br>the documentation<br>from golang source files| pkgsite
-    watcher -->|Restarts the pkgsite instance<br>to reload the last changes<br>on documentation| pkgsite
-    watcher -->|Emits a request<br>to handle a reload event| reloader
-    pkgsite -->|Gets documentation pages| reloader
-    reloader -->|Serves documentation pages<br>with a live-reload system injected| browser
-```
+[![](https://mermaid.ink/img/pako:eNqFVE1v2zAM_SuCzknROp8Ohh6KFb3kMCTDCizZQbFoW6steZKcLEvy30dZivM5TAdboh8f-UjKO5ooDnRCM82qnHx9WUqCy9QrbyhUworF1D3JRukPU7EEfniQW1xoSKxQsnV1q0UuUjZJWTdVBQdN3u8RwBoKVYEO0Nog8E2d7GfYlVYb0yJhC-TFWxBzh5F0u93n_SsX1hCjap0ASUUBZn_K74bb-8xzPJCCGUuSnMkMzKeVfkaRXCV1CdIyJ3l_CuV5QPJjIm0BE4VoITHrLx-ZERaIL-ZUrO_XcTo7WVuWtSowrll88-8zR7dKxWvUtcCyhe0ZoEnqhhClrkWCPvOwuaLcMJvkmPS7fx_xVyiN6hl2djELmwZ30TO3Kq-8rcANqM3xrIJtj4jriBdOVkJyIbP9UaeHhkMDnApjQRqSKk2Y3Ib-hfZlqp0Ar-uOP-owREmMyyyxOWZrmbaOwB0uBsAZU61K5C0wytWQBdVBTaijCzGDhtI07AFFhEQjRm0CqVDZBvH_MfxnpNfSzT5Dtl81Bg3cSMULaMxNEBxiafdtMz3NMS9H8wbIchGTVCxzGi99jqfGyQ0W3HVzaWyEzTGDAm9BN6Rhtti5EgvxE28C8P3xStIOLUGXTHD8Te1cpCXFupSwpBPcckhZXdglXcoDQllt1XwrE4q_iMJAh9YVZxY-C4aDX7bWikk62dHfdBINBg-9cdTvR3E8HMbxuN-hWzrpRmgexaN-PBiOH5_Gw0OH_lEKGZ4eHsfROO73okE0GPb6o1FD9735aHUNh79RrMnH)](https://mermaid.live/edit#pako:eNqFVE1v2zAM_SuCzknROp8Ohh6KFb3kMCTDCizZQbFoW6steZKcLEvy30dZivM5TAdboh8f-UjKO5ooDnRCM82qnHx9WUqCy9QrbyhUworF1D3JRukPU7EEfniQW1xoSKxQsnV1q0UuUjZJWTdVBQdN3u8RwBoKVYEO0Nog8E2d7GfYlVYb0yJhC-TFWxBzh5F0u93n_SsX1hCjap0ASUUBZn_K74bb-8xzPJCCGUuSnMkMzKeVfkaRXCV1CdIyJ3l_CuV5QPJjIm0BE4VoITHrLx-ZERaIL-ZUrO_XcTo7WVuWtSowrll88-8zR7dKxWvUtcCyhe0ZoEnqhhClrkWCPvOwuaLcMJvkmPS7fx_xVyiN6hl2djELmwZ30TO3Kq-8rcANqM3xrIJtj4jriBdOVkJyIbP9UaeHhkMDnApjQRqSKk2Y3Ib-hfZlqp0Ar-uOP-owREmMyyyxOWZrmbaOwB0uBsAZU61K5C0wytWQBdVBTaijCzGDhtI07AFFhEQjRm0CqVDZBvH_MfxnpNfSzT5Dtl81Bg3cSMULaMxNEBxiafdtMz3NMS9H8wbIchGTVCxzGi99jqfGyQ0W3HVzaWyEzTGDAm9BN6Rhtti5EgvxE28C8P3xStIOLUGXTHD8Te1cpCXFupSwpBPcckhZXdglXcoDQllt1XwrE4q_iMJAh9YVZxY-C4aDX7bWikk62dHfdBINBg-9cdTvR3E8HMbxuN-hWzrpRmgexaN-PBiOH5_Gw0OH_lEKGZ4eHsfROO73okE0GPb6o1FD9735aHUNh79RrMnH)
 
 In the next diagram you can look the three main sequences that it's contained in `pkgsite-local-live`.
 
@@ -92,81 +61,11 @@ The next sequence shows us the process involucred when a developer visit a docum
 
 The last sequence shows us the steps launched when a go file is modified, created or deleted.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    rect rgb(191, 223, 255)
-        note right of Entrypoint: Starts container
-        Entrypoint-)ReloaderServer: Starts reloader server<br>with a proxy and interceptors
-        Entrypoint-)Watcher: Starts watcher service<br>to listen any change on workspace folder
-        Watcher->>PkgsiteServer: Starts pkgsite server instance<br>loading all go modules in workspace folder
-        activate PkgsiteServer
-        Workspace->>PkgsiteServer: Loads Go modules
-        deactivate PkgsiteServer
-    end
-
-    rect rgb(191, 230, 223)
-        note right of Developer: Developer queries documentation page
-        actor Developer
-        Developer->>Browser: Queries documentation about a go module
-        activate Browser
-        Browser->>ReloaderServer: Gets documentation pages
-        activate ReloaderServer
-        ReloaderServer->>PkgsiteServer: Requests documentation pages
-        activate PkgsiteServer
-        PkgsiteServer->>ReloaderServer: Responses with some resources
-        deactivate PkgsiteServer
-        ReloaderServer->>Browser: Responses with documentation pages with live-reload system
-        deactivate ReloaderServer
-        Browser-->>ReloaderServer: Connects to websocket to listen reload signal
-        activate ReloaderServer
-        ReloaderServer-->>Browser: Accepts websocket connection
-        deactivate ReloaderServer
-        Browser->>Developer: Shows documentation resource
-        deactivate Browser
-    end
-
-    rect rgb(223, 230, 191)
-        note right of Developer: Changes some go file on workspace
-        Developer-)Workspace: Saves changes on a go file
-        Workspace->>Watcher: Changes detected on go files
-        activate Watcher
-        Watcher-)PkgsiteServer: Restarts the server instance
-        activate Watcher
-        activate PkgsiteServer
-        Workspace->>PkgsiteServer: Loads Go modules
-        deactivate PkgsiteServer
-        note right of Watcher: Waits 1 second
-        Watcher-)ReloaderServer: Requests a reload the all clients
-        deactivate Watcher
-        deactivate Watcher
-        activate ReloaderServer
-        ReloaderServer-)Browser: Sends a websocket message to refresh the views
-        deactivate ReloaderServer
-        activate Browser
-
-        note left of Browser: Reloads when the pages rendered in client recieved the reload websocket message
-
-        Browser->>ReloaderServer: Gets documentation pages
-        activate ReloaderServer
-        ReloaderServer->>PkgsiteServer: Requests documentation pages
-        activate PkgsiteServer
-        PkgsiteServer->>ReloaderServer: Responses with some resources
-        deactivate PkgsiteServer
-        ReloaderServer->>Browser: Responses with documentation pages with live-reload system
-        deactivate ReloaderServer
-        Browser-->>ReloaderServer: Connects to websocket to listen reload signal
-        activate ReloaderServer
-        ReloaderServer-->>Browser: Accepts websocket connection
-        deactivate ReloaderServer
-        Browser->>Developer: Shows documentation resource
-        deactivate Browser
-    end
-```
+[![](https://mermaid.ink/img/pako:eNrtV01v2kAQ_Ssrn4oEUTAfwahCapMqlx7acIhUcVnWg72KvevuriE0yn_vrG1sgzcRyaVSFR8QzHrefL5n_OQxGYI39zT8zkEwuOE0UjRdCYIXzY0UeboGVf5WwAxR0frTMBj2ie-P8GMy6ZWH9hLSAFE8ig2RG_JNGLXPJBdmTpaGKqMJk8JQLg6A9mruGvTuIJE0BLUEtQVVe6nKTHRh_7xWix03MaEkU_JxT6gICfqDYpAZqbQb_J4aFrdQd-XvApQzsKhGkoRrAwIh94TFVERApCA7qR50RhmQjUzCdvYV6GCx-PEQaW7gJPWstFaZY5baUFEGszVxERGaJCSSJJVhnoDGW14JR5nhW4p4R9Fa6Rw8uwl9x3Ca3NaBGqcQXoMFEa6Ec_6jy2IJXpz_DWxxcJkNXn8luGaKY5mhZHkKuA2GY4MzGsFRlVI1Ps1BbcLyviq50xb7pxORrmVucEPqzjqaWEE0J5UB0U838RaMK2ftQD12bW44tncHdGcpqM8O88IGHJkdhdyBzqTQ2K-CQlqmODHQMkfynL0TznLqgZyEcJRTHiR8C4OS20TvkXapM_5L_TwMy1HktRQCd1UTJPQO1lqyBzCkYfchKI8ETd4_wnbRX5gVH90Kx8oksOh3lbVYtPizjNF40snD1JzoR6vtonCp3pbCSOZzKHxdqKEuNwZZteHJsTa6aNqrBQlroFt0ZxWMpegBxq1ftV4fIodgMHsIrW_l6SJG5dfV6F6HcLoUaRN3BPoc3H8gxt0J1V26pxxLGWIhuHiho_quElR6Qw98sH2wTyOWcNwyd1KdLrx29lZC9Wo6LXFnbWYNnVLQGrXDsljBBpc_LvLdctjpNxGsy5GT3iawKVrbErSkmNcuRu2wQUsRU5gjKLD_PaqWWXpxXP6ylVVXOyW0A348cT6eOP_nE8freymolPIQXy-erHnlIStSWHlz_BrChuaJWXkr8Yy32leN5V4wb76hiYa-l2cholavI7U1o8KbP3mP3hxfPC5GM3889oNgOg2C2bjv7b35wEfzVXA1DibT2eVwNn3ue3-kRIThxeXMnwXjkT_xJ9PR-OqqgPtVHBqVw_NfdEBkqQ)](https://mermaid.live/edit#pako:eNrtV01v2kAQ_Ssrn4oEUTAfwahCapMqlx7acIhUcVnWg72KvevuriE0yn_vrG1sgzcRyaVSFR8QzHrefL5n_OQxGYI39zT8zkEwuOE0UjRdCYIXzY0UeboGVf5WwAxR0frTMBj2ie-P8GMy6ZWH9hLSAFE8ig2RG_JNGLXPJBdmTpaGKqMJk8JQLg6A9mruGvTuIJE0BLUEtQVVe6nKTHRh_7xWix03MaEkU_JxT6gICfqDYpAZqbQb_J4aFrdQd-XvApQzsKhGkoRrAwIh94TFVERApCA7qR50RhmQjUzCdvYV6GCx-PEQaW7gJPWstFaZY5baUFEGszVxERGaJCSSJJVhnoDGW14JR5nhW4p4R9Fa6Rw8uwl9x3Ca3NaBGqcQXoMFEa6Ec_6jy2IJXpz_DWxxcJkNXn8luGaKY5mhZHkKuA2GY4MzGsFRlVI1Ps1BbcLyviq50xb7pxORrmVucEPqzjqaWEE0J5UB0U838RaMK2ftQD12bW44tncHdGcpqM8O88IGHJkdhdyBzqTQ2K-CQlqmODHQMkfynL0TznLqgZyEcJRTHiR8C4OS20TvkXapM_5L_TwMy1HktRQCd1UTJPQO1lqyBzCkYfchKI8ETd4_wnbRX5gVH90Kx8oksOh3lbVYtPizjNF40snD1JzoR6vtonCp3pbCSOZzKHxdqKEuNwZZteHJsTa6aNqrBQlroFt0ZxWMpegBxq1ftV4fIodgMHsIrW_l6SJG5dfV6F6HcLoUaRN3BPoc3H8gxt0J1V26pxxLGWIhuHiho_quElR6Qw98sH2wTyOWcNwyd1KdLrx29lZC9Wo6LXFnbWYNnVLQGrXDsljBBpc_LvLdctjpNxGsy5GT3iawKVrbErSkmNcuRu2wQUsRU5gjKLD_PaqWWXpxXP6ylVVXOyW0A348cT6eOP_nE8freymolPIQXy-erHnlIStSWHlz_BrChuaJWXkr8Yy32leN5V4wb76hiYa-l2cholavI7U1o8KbP3mP3hxfPC5GM3889oNgOg2C2bjv7b35wEfzVXA1DibT2eVwNn3ue3-kRIThxeXMnwXjkT_xJ9PR-OqqgPtVHBqVw_NfdEBkqQ)
 
 Please, look at [Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live) to choose the way to collaborate with you feel better.
 
-# :clamp: Use
+# Use
 
 ## Run
 
@@ -205,14 +104,14 @@ docker run -v $GOPATH/src:/go/src -p 8080:80 mauroalderete/pkgsite-local-live:la
 
 Configures a container to load in pkgsite instance all modules stored in the golang standard workspace. Binds the port 8080 to access to pkgsite website.
 
-# :rocket: Upcomming Features
+# Upcomming Features
 
 `pkgsite-local-live` has all the potential to grow further. Here are some of the upcoming features planned (not in any order),
 
 - ✔️ Filter modules to load. You will can filter the modules that you want to load by pkgsite instance using a yaml file configure.
 - ✔️ Index. You will can enable a index in the home page to view all modules loaded and visit to speedly.
 
-# :hammer: How to Set up `pkgsite-local-live` for Development?
+# How to Set up `pkgsite-local-live` for Development?
 
 You set up `pkgsite-local-live` locally with a few easy steps.
 
@@ -233,7 +132,7 @@ got=go test -v ./... -coverprofile=coverage.out -covermode=count && go tool cove
 ```bash
 docker build -t <username>/pkgsite-local-live:<tag> .
 ```
-# :handshake: Contributing to `pkgsite-local-live`
+# Contributing to `pkgsite-local-live`
 
 Any kind of positive contribution is welcome! Please help us to grow by contributing to the project.
 
@@ -241,9 +140,9 @@ If you wish to contribute, you can work on any [issue](https://github.com/mauroa
 
 > Please read [`CONTRIBUTING`](CONTRIBUTING.md) for details on our [`CODE OF CONDUCT`](CODE_OF_CONDUCT.md), and the process for submitting pull requests to us.
 
-# :pray: Support
+# Support
 
-We all need support and motivation. `pkgsite-local-live` is not an exception. Please give this project a :star: start to encourage and show that you liked it. Don't forget to leave a :star: star before you move away.
+We all need support and motivation. `pkgsite-local-live` is not an exception. Please give this project a start to encourage and show that you liked it.
 
 If you found the app helpful, consider supporting us with a coffee.
 
