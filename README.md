@@ -142,7 +142,7 @@ If you wish to contribute, you can work on any [issue](https://github.com/mauroa
 
 # Support
 
-We all need support and motivation. `pkgsite-local-live` is not an exception. Please give this project a start to encourage and show that you liked it. Don't forget to leave a star before you move away.
+We all need support and motivation. `pkgsite-local-live` is not an exception. Please give this project a start to encourage and show that you liked it.
 
 If you found the app helpful, consider supporting us with a coffee.
 
