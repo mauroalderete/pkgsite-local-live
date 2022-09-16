@@ -40,22 +40,129 @@
   - [Examples](#examples)
 - [:rocket: Upcomming Features](#rocket-upcomming-features)
 - [:hammer: How to Set up `pkgsite-local-live` for Development?](#hammer-how-to-set-up-pkgsite-local-live-for-development)
-  - [Build](#build)
-- [:hamburger: Built With](#hamburger-built-with)
+  - [Test reloader service](#test-reloader-service)
+  - [Build image](#build-image)
 - [:handshake: Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live)
 - [:pray: Support](#pray-support)
 
 &nbsp;
 # :wave: Introducing `pkgsite-local-live`
-`pkgsite-local-live` is a docker image that maintains a pkgsite instance up with all go modules stored in a folder loaded. A watcher looks at any change in the go files to know when to restart the pkgsite instance and back reload your browser view.
+`pkgsite-local-live` is a docker image that maintains a pkgsite instance up with all go modules stored in the folder `$GOPATH/src` of the container. A watcher looks at any change in the go files to know when to restart the pkgsite instance and back reload all open browser views.
 
-With `pkgsite-local-live` you can query the documentation from the local projects stored in your personal workspace, at the same time that you can view the changes that occur while you working on them in real-time.
+Binding your local `$GOPATH/src` you can use `pkgsite-local-live` to query the documentation from the local projects stored in your personal workspace, at the same time you can view the changes that occur while you are working on them in real-time.
 
-For the moment, this project is in an early development phase, so all versions are unstable.
+```mermaid
+graph TB
+    subgraph local[Local workspace]
+        direction TB
+        workspace[fa:fa-folder Workspace]
+        developer[fa:fa-user Go developer]
+        browser[fa:fa-eye Browser]
 
-You can take a look at the [upcoming features](#rocket-upcomming-features) to know more about the `pkgsite-local-live` future.
+        developer --->|Edits source files| workspace
+        browser --->|Shows last changes<br>on documentation| developer
+    end
 
-Hey! don't be discouraged, you can help me to carry out this project in many ways, contributing with new features, reporting bugs, sharing in your social networks or supporting with a :star:
+    subgraph container[Pkgsite Local Live]
+        direction LR
+        subgraph volumes[Volumes]
+            modules[Go modules]
+        end
+        subgraph services[Services]
+            watcher[Watcher service]
+            reloader[Reloader server]
+            pkgsite[Pkgsite server]
+        end
+    end
+
+    workspace -->|Volume binding| modules
+    modules -->|Listens for any change<br>on go files| watcher
+    modules -->|Loads once at the start<br>the documentation<br>from golang source files| pkgsite
+    watcher -->|Restarts the pkgsite instance<br>to reload the last changes<br>on documentation| pkgsite
+    watcher -->|Emits a request<br>to handle a reload event| reloader
+    pkgsite -->|Gets documentation pages| reloader
+    reloader -->|Serves documentation pages<br>with a live-reload system injected| browser
+```
+
+In the next diagram you can look the three main sequences that it's contained in `pkgsite-local-live`.
+
+The first sequence block shows how are executed the internal service. A server named Reloader Server provide a proxy to pkgsite sources at the same time handle the reload system event to implement a live-reload feature. A watcher process is charge of listen any change on workspace folder that can contains change on documentation pages.
+
+The next sequence shows us the process involucred when a developer visit a documentation page with his browser.
+
+The last sequence shows us the steps launched when a go file is modified, created or deleted.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    rect rgb(191, 223, 255)
+        note right of Entrypoint: Starts container
+        Entrypoint-)ReloaderServer: Starts reloader server<br>with a proxy and interceptors
+        Entrypoint-)Watcher: Starts watcher service<br>to listen any change on workspace folder
+        Watcher->>PkgsiteServer: Starts pkgsite server instance<br>loading all go modules in workspace folder
+        activate PkgsiteServer
+        Workspace->>PkgsiteServer: Loads Go modules
+        deactivate PkgsiteServer
+    end
+
+    rect rgb(191, 230, 223)
+        note right of Developer: Developer queries documentation page
+        actor Developer
+        Developer->>Browser: Queries documentation about a go module
+        activate Browser
+        Browser->>ReloaderServer: Gets documentation pages
+        activate ReloaderServer
+        ReloaderServer->>PkgsiteServer: Requests documentation pages
+        activate PkgsiteServer
+        PkgsiteServer->>ReloaderServer: Responses with some resources
+        deactivate PkgsiteServer
+        ReloaderServer->>Browser: Responses with documentation pages with live-reload system
+        deactivate ReloaderServer
+        Browser-->>ReloaderServer: Connects to websocket to listen reload signal
+        activate ReloaderServer
+        ReloaderServer-->>Browser: Accepts websocket connection
+        deactivate ReloaderServer
+        Browser->>Developer: Shows documentation resource
+        deactivate Browser
+    end
+
+    rect rgb(223, 230, 191)
+        note right of Developer: Changes some go file on workspace
+        Developer-)Workspace: Saves changes on a go file
+        Workspace->>Watcher: Changes detected on go files
+        activate Watcher
+        Watcher-)PkgsiteServer: Restarts the server instance
+        activate Watcher
+        activate PkgsiteServer
+        Workspace->>PkgsiteServer: Loads Go modules
+        deactivate PkgsiteServer
+        note right of Watcher: Waits 1 second
+        Watcher-)ReloaderServer: Requests a reload the all clients
+        deactivate Watcher
+        deactivate Watcher
+        activate ReloaderServer
+        ReloaderServer-)Browser: Sends a websocket message to refresh the views
+        deactivate ReloaderServer
+        activate Browser
+
+        note left of Browser: Reloads when the pages rendered in client recieved the reload websocket message
+
+        Browser->>ReloaderServer: Gets documentation pages
+        activate ReloaderServer
+        ReloaderServer->>PkgsiteServer: Requests documentation pages
+        activate PkgsiteServer
+        PkgsiteServer->>ReloaderServer: Responses with some resources
+        deactivate PkgsiteServer
+        ReloaderServer->>Browser: Responses with documentation pages with live-reload system
+        deactivate ReloaderServer
+        Browser-->>ReloaderServer: Connects to websocket to listen reload signal
+        activate ReloaderServer
+        ReloaderServer-->>Browser: Accepts websocket connection
+        deactivate ReloaderServer
+        Browser->>Developer: Shows documentation resource
+        deactivate Browser
+    end
+```
 
 Please, look at [Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live) to choose the way to collaborate with you feel better.
 
@@ -64,16 +171,16 @@ Please, look at [Contributing to `pkgsite-local-live`](#handshake-contributing-t
 ## Run
 
 ```bash
-docker run -v <GO WORKSPACE>:/go/src -p <PORT>:3000 mauroalderete/pkgsite-local-live:latest
+docker run -v $GOPATH/src:/go/src -p 8080:80 mauroalderete/pkgsite-local-live:latest
 ```
 
 ## Ports
 
-Exposes the port 3000 to access to pkgsite instance with all modules loaded.
+Exposes the port 80 to access to pkgsite instance with all modules loaded.
 
 ## Volumes
 
-`pkgsite-local-live` searches the modules in `/go/src` path. You must provide a source that will contain the go modules.
+`pkgsite-local-live` searches the modules in `/go/src` path. You must provide a source that will contains the go modules.
 
 If the volume source doesn't have any go module, the pkgsite instance will end with an error and you cannot see anything through the port. This state will maintain this way to a 'go.mod' file will be found.
 
@@ -93,7 +200,7 @@ It is expected that the source volume contains many go modules, each one in its 
 ## Examples
 
 ```bash
-docker run -v $GOPATH/src:/go/src -p 8080:3000 mauroalderete/pkgsite-local-live:latest
+docker run -v $GOPATH/src:/go/src -p 8080:80 mauroalderete/pkgsite-local-live:latest
 ```
 
 Configures a container to load in pkgsite instance all modules stored in the golang standard workspace. Binds the port 8080 to access to pkgsite website.
@@ -102,8 +209,8 @@ Configures a container to load in pkgsite instance all modules stored in the gol
 
 `pkgsite-local-live` has all the potential to grow further. Here are some of the upcoming features planned (not in any order),
 
-- ✔️ Liverelaod. Any change in your go files will show updating in your browser.
-- ✔️ Auto-scan modules. Only you will need to configure a volume with your workspace and all go modules will be loaded.
+- ✔️ Filter modules to load. You will can filter the modules that you want to load by pkgsite instance using a yaml file configure.
+- ✔️ Index. You will can enable a index in the home page to view all modules loaded and visit to speedly.
 
 # :hammer: How to Set up `pkgsite-local-live` for Development?
 
@@ -116,16 +223,16 @@ git clone https://github.com/mauroalderete/pkgsite-local-live
 cd pkgsite-local-live
 ```
 
-## Build
+## Test reloader service
+
+```bash
+got=go test -v ./... -coverprofile=coverage.out -covermode=count && go tool cover -html=coverage.out
+```
+## Build image
 
 ```bash
 docker build -t <username>/pkgsite-local-live:<tag> .
 ```
-
-# :hamburger: Built With
-
-- [Docker](https://www.docker.com/) 20.10.17
-
 # :handshake: Contributing to `pkgsite-local-live`
 
 Any kind of positive contribution is welcome! Please help us to grow by contributing to the project.
