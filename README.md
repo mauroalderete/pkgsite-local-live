@@ -84,6 +84,86 @@ graph TB
     reloader -->|Serves documentation pages<br>with a live-reload system injected| browser
 ```
 
+In the next diagram you can look the three main sequences that it's contained in `pkgsite-local-live`.
+
+The first sequence block shows how are executed the internal service. A server named Reloader Server provide a proxy to pkgsite sources at the same time handle the reload system event to implement a live-reload feature. A watcher process is charge of listen any change on workspace folder that can contains change on documentation pages.
+
+The next sequence shows us the process involucred when a developer visit a documentation page with his browser.
+
+The last sequence shows us the steps launched when a go file is modified, created or deleted.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    rect rgb(191, 223, 255)
+        note right of Entrypoint: Starts container
+        Entrypoint-)ReloaderServer: Starts reloader server<br>with a proxy and interceptors
+        Entrypoint-)Watcher: Starts watcher service<br>to listen any change on workspace folder
+        Watcher->>PkgsiteServer: Starts pkgsite server instance<br>loading all go modules in workspace folder
+        activate PkgsiteServer
+        Workspace->>PkgsiteServer: Loads Go modules
+        deactivate PkgsiteServer
+    end
+
+    rect rgb(191, 230, 223)
+        note right of Developer: Developer queries documentation page
+        actor Developer
+        Developer->>Browser: Queries documentation about a go module
+        activate Browser
+        Browser->>ReloaderServer: Gets documentation pages
+        activate ReloaderServer
+        ReloaderServer->>PkgsiteServer: Requests documentation pages
+        activate PkgsiteServer
+        PkgsiteServer->>ReloaderServer: Responses with some resources
+        deactivate PkgsiteServer
+        ReloaderServer->>Browser: Responses with documentation pages with live-reload system
+        deactivate ReloaderServer
+        Browser-->>ReloaderServer: Connects to websocket to listen reload signal
+        activate ReloaderServer
+        ReloaderServer-->>Browser: Accepts websocket connection
+        deactivate ReloaderServer
+        Browser->>Developer: Shows documentation resource
+        deactivate Browser
+    end
+
+    rect rgb(223, 230, 191)
+        note right of Developer: Changes some go file on workspace
+        Developer-)Workspace: Saves changes on a go file
+        Workspace->>Watcher: Changes detected on go files
+        activate Watcher
+        Watcher-)PkgsiteServer: Restarts the server instance
+        activate Watcher
+        activate PkgsiteServer
+        Workspace->>PkgsiteServer: Loads Go modules
+        deactivate PkgsiteServer
+        note right of Watcher: Waits 1 second
+        Watcher-)ReloaderServer: Requests a reload the all clients
+        deactivate Watcher
+        deactivate Watcher
+        activate ReloaderServer
+        ReloaderServer-)Browser: Sends a websocket message to refresh the views
+        deactivate ReloaderServer
+        activate Browser
+
+        note left of Browser: Reloads when the pages rendered in client recieved the reload websocket message
+
+        Browser->>ReloaderServer: Gets documentation pages
+        activate ReloaderServer
+        ReloaderServer->>PkgsiteServer: Requests documentation pages
+        activate PkgsiteServer
+        PkgsiteServer->>ReloaderServer: Responses with some resources
+        deactivate PkgsiteServer
+        ReloaderServer->>Browser: Responses with documentation pages with live-reload system
+        deactivate ReloaderServer
+        Browser-->>ReloaderServer: Connects to websocket to listen reload signal
+        activate ReloaderServer
+        ReloaderServer-->>Browser: Accepts websocket connection
+        deactivate ReloaderServer
+        Browser->>Developer: Shows documentation resource
+        deactivate Browser
+    end
+```
+
 Please, look at [Contributing to `pkgsite-local-live`](#handshake-contributing-to-pkgsite-local-live) to choose the way to collaborate with you feel better.
 
 # :clamp: Use
